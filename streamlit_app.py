@@ -10,20 +10,16 @@ import logging
 
 # ─── 1) CONFIGURAZIONE DELLA PAGINA E DEL LOG ─────────────────────────────────
 
-# Impostazioni generali di Streamlit: titolo, icona, layout
 st.set_page_config(
     page_title="🎓 Student Analytics Dashboard",
     page_icon="🎓",
     layout="wide",
     initial_sidebar_state="expanded",
-    # (streamlit.cloud rispetta il tema scelto a livello di account o default "Dark")
 )
 
-# Configurazione del logging (utile per debug in locale)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Costanti del progetto BigQuery
 PROJECT_ID = "laboratorio-ai-460517"
 DATASET_ID = "dataset"
 
@@ -33,14 +29,10 @@ DATASET_ID = "dataset"
 def init_bigquery_client():
     """
     Inizializza il client BigQuery utilizzando le credenziali
-    presenti in st.secrets (secrets.toml o Streamlit Cloud secrets).
-    Ritorna (client, messaggio_status). In caso di errore, client=None e status contiene l’errore.
+    presenti in st.secrets. Ritorna (client, messaggio_status).
+    In caso di errore, client=None e status contiene l’errore.
     """
     try:
-        # Debug rapido: mostra le chiavi caricate in st.secrets (rimuovere in produzione)
-        # st.sidebar.write("DEBUG st.secrets keys:", list(st.secrets.keys()))
-
-        # Costruisco il dict con tutte le voci della "service account"
         credentials_dict = {
             "type": st.secrets["type"],
             "project_id": st.secrets["project_id"],
@@ -55,13 +47,10 @@ def init_bigquery_client():
             "universe_domain": st.secrets["universe_domain"]
         }
 
-        # Creo le credenziali da dict
         credentials = service_account.Credentials.from_service_account_info(credentials_dict)
-
-        # Inizializzo il client BigQuery
         client = bigquery.Client(credentials=credentials, project=PROJECT_ID)
 
-        # Eseguo una query di test per assicurarmi che la connessione funzioni
+        # Test di connessione
         test_query = "SELECT 1 as check_connection"
         result = client.query(test_query).result()
         for row in result:
@@ -88,17 +77,18 @@ def init_bigquery_client():
 @st.cache_data(ttl=300)
 def get_all_tables():
     """
-    Recupera tutte le tabelle presenti nel dataset specificato. Ritorna (lista_tables, messaggio_status).
+    Recupera tutte le tabelle presenti nel dataset specificato.
+    Ritorna (lista_tables, messaggio_status).
     Ogni elemento di lista_tables è un dict con:
         - id: l’ID (nome) della tabella
-        - description: descrizione testuale generica (in base al nome)
+        - name: stesso dell’ID
+        - description: descrizione testuale
         - rows: numero di righe
         - size_mb: dimensione in MB
         - created: data di creazione
     """
     client, status = init_bigquery_client()
     if not client:
-        # Se non sono riuscito a connettermi, ritorno lista vuota e status
         return [], status
 
     try:
@@ -119,7 +109,6 @@ def get_all_tables():
                 "created": table_obj.created.strftime("%Y-%m-%d") if table_obj.created else "N/A"
             })
 
-        # Ordino le tabelle per nome alfanumerico
         tables_info = sorted(tables_info, key=lambda x: x["id"])
         return tables_info, f"✅ Trovate {len(tables_info)} tabelle"
 
@@ -132,7 +121,7 @@ def get_all_tables():
 def get_table_description(table_id: str) -> str:
     """
     Ritorna una descrizione testuale in base al nome della tabella.
-    Se non è conosciuta, restituisce un generico "Tabella dati: { table_id }".
+    Se non è riconosciuta, restituisce "Tabella dati: {table_id}".
     """
     descriptions = {
         "studenti": "Dati anagrafici e performance degli studenti",
@@ -152,8 +141,8 @@ def get_table_description(table_id: str) -> str:
 @st.cache_data(ttl=300)
 def load_full_table(table_id: str) -> (pd.DataFrame, str):
     """
-    Carica l’intera tabella BigQuery (senza limiti) e la converte in DataFrame pandas.
-    Ritorna (df, status_message). Se df è None, status_message è l’errore.
+    Carica l’intera tabella BigQuery (senza limiti) in un DataFrame pandas.
+    Ritorna (df, status_message). Se df è None, status_message contiene l’errore.
     """
     client, status = init_bigquery_client()
     if not client:
@@ -203,7 +192,6 @@ def render_overview(tables_info: list):
     st.markdown("---")
     st.subheader("🔍 Dettaglio Tabelle")
 
-    # Creo DataFrame per mostrargli con st.dataframe
     df_overview = pd.DataFrame([
         {
             "Tabella": t["name"],
@@ -225,11 +213,11 @@ def render_table_inspection(df: pd.DataFrame, table_info: dict):
     3. Anteprima (prime 20 righe)
     4. Selezione colonne da includere/visualizzare
     5. Grafici base: distribuzioni (istogrammi) e correlazioni (heatmap)
-    6. Tab “Raw Data” per scaricare CSV e filtrare con testo
+    6. Sezione “Dati Grezzi e Download” con filtro testuale
     """
     st.title(f"📈 Analisi: {table_info['description']}")
 
-    # ─── 5.1) METRICHE BASE SUI DATI ────────────────────────────────────────────
+    # ─── 5.1) METRICHE BASE ────────────────────────────────────────────────────────
     st.markdown("### 📏 Metriche Generali")
 
     col_r, col_c, col_m, col_mem = st.columns(4)
@@ -242,14 +230,12 @@ def render_table_inspection(df: pd.DataFrame, table_info: dict):
 
     st.markdown("---")
 
-    # ─── 5.2) ANTEPRIMA E SELEZIONE COLONNE ───────────────────────────────────────
+    # ─── 5.2) ANTEPRIMA E SELEZIONE COLONNE ─────────────────────────────────────────
     st.subheader("🔍 Anteprima e Selezione Colonne")
 
-    # Mostro le prime 20 righe
     st.write("**Anteprima (prime 20 righe):**")
     st.dataframe(df.head(20), use_container_width=True, height=240)
 
-    # Permetto di scegliere colonne da isolare/visualizzare
     all_cols = df.columns.tolist()
     default_cols = all_cols[: min(10, len(all_cols))]
     selected_cols = st.multiselect(
@@ -265,14 +251,13 @@ def render_table_inspection(df: pd.DataFrame, table_info: dict):
 
     st.markdown("---")
 
-    # ─── 5.3) GRAFICI (DISTRIBUZIONI E CORRELAZIONI) ─────────────────────────────
+    # ─── 5.3) GRAFICI BASE ─────────────────────────────────────────────────────────
     st.subheader("📊 Grafici Base")
 
     numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
     if not numeric_cols:
         st.info("ℹ️ Nessuna colonna numerica disponibile per i grafici.")
     else:
-        # Istogrammi per le prime 3 variabili numeriche (scelibili da utente)
         with st.expander("📈 Istogrammi Variabili Numeriche"):
             selected_num = st.multiselect(
                 "Seleziona fino a 3 variabili numeriche da plottare:",
@@ -282,12 +267,11 @@ def render_table_inspection(df: pd.DataFrame, table_info: dict):
             )
             for col in selected_num:
                 fig = px.histogram(df, x=col, title=f"Istogramma di {col}")
-                fig.update_layout(margin=dict(l=20,r=20,t=40,b=20))
+                fig.update_layout(margin=dict(l=20, r=20, t=40, b=20))
                 st.plotly_chart(fig, use_container_width=True)
 
         st.markdown("")
 
-        # Heatmap delle correlazioni
         with st.expander("🔗 Matrice delle Correlazioni"):
             if len(numeric_cols) < 2:
                 st.write("Serve almeno una coppia di variabili numeriche.")
@@ -296,19 +280,19 @@ def render_table_inspection(df: pd.DataFrame, table_info: dict):
                 fig_corr = px.imshow(
                     corr,
                     labels=dict(x="Variabile", y="Variabile", color="Correlazione"),
-                    x=numeric_cols, y=numeric_cols,
+                    x=numeric_cols,
+                    y=numeric_cols,
                     color_continuous_scale="RdBu_r",
                     title="Heatmap Correlazioni"
                 )
-                fig_corr.update_layout(margin=dict(l=20,r=20,t=40,b=20), height=600)
+                fig_corr.update_layout(margin=dict(l=20, r=20, t=40, b=20), height=600)
                 st.plotly_chart(fig_corr, use_container_width=True)
 
     st.markdown("---")
 
-    # ─── 5.4) TAB PER DATI GREZZI E DOWNLOAD ─────────────────────────────────────
+    # ─── 5.4) DATI GREZZI E DOWNLOAD ───────────────────────────────────────────────
     st.subheader("📋 Dati Grezzi e Download")
 
-    # Campo di ricerca testuale nei dati
     search_term = st.text_input("🔎 Cerca testo nei dati (si effettua su tutte le colonne):")
     df_search = df.copy()
     if search_term:
@@ -316,24 +300,21 @@ def render_table_inspection(df: pd.DataFrame, table_info: dict):
         df_search = df_search[mask]
         st.info(f"Trovate {len(df_search):,} righe contenenti '{search_term}'")
 
-    # Mostro il dataframe filtrato (o totale, se search_term vuoto)
     st.dataframe(df_search.reset_index(drop=True), use_container_width=True, height=300)
 
-    # Pulsante per scaricare in CSV
     csv = df_search.to_csv(index=False).encode("utf-8")
     st.download_button(
         label="📥 Scarica i dati in CSV",
         data=csv,
         file_name=f"{table_info['name']}_export.csv",
         mime="text/csv",
-        help="Scarica un file CSV con i dati visualizzati (rispettando eventuale filtro di ricerca)."
+        help="Scarica un file CSV con i dati visualizzati."
     )
 
 
 # ─── 6) FUNZIONE PRINCIPALE (ENTRY POINT) ────────────────────────────────────────
 
 def main():
-    # Titolo principale (appare in alto a sinistra)
     st.sidebar.title("🎓 Student Analytics Dashboard")
     st.sidebar.markdown("""
     Benvenuto! Questa applicazione ti permette di esplorare **tutti i dati** delle tabelle
@@ -351,8 +332,9 @@ def main():
             st.stop()
 
     # ─── 6.2) RECUPERO METADATI SULLE TABELLE ───────────────────────────────────────
-    with st.sidebar.spinner("📡 Recupero tabelle..."):
+    with st.spinner("📡 Recupero tabelle..."):
         tables_info, tables_status = get_all_tables()
+
     if not tables_info:
         st.sidebar.error(tables_status)
         st.error("❌ Errore nel recupero delle tabelle. Controlla i log.")
@@ -366,7 +348,6 @@ def main():
     table_names = [t["name"] for t in tables_info]
     sel_table = st.sidebar.selectbox("Scegli la tabella da analizzare:", options=table_names)
 
-    # Trovo l’oggetto table_info corrispondente
     current_info = next((t for t in tables_info if t["name"] == sel_table), None)
 
     # ─── 6.4) CARICAMENTO DEI DATI (TUTTI) ────────────────────────────────────────
@@ -390,6 +371,6 @@ def main():
     render_table_inspection(df, current_info)
 
 
-# Esegui l’app
 if __name__ == "__main__":
     main()
+
