@@ -1,741 +1,608 @@
-# ========================================
-# STUDENT ANALYTICS PLATFORM - VERSIONE OTTIMIZZATA
-# ========================================
-"""
-Piattaforma di analisi dati per studenti universitari.
-Questo sistema permette di:
-- Connettersi a BigQuery per recuperare dati
-- Esplorare tabelle e dataset
-- Eseguire analisi statistiche avanzate
-- Creare visualizzazioni interattive
-- Analizzare predizioni di abbandono e clustering
-
-Autore: Student Analytics Team
-Data: 2025
-Versione: 3.0 - Ottimizzata
-"""
-
-# ========================================
-# IMPORTAZIONE LIBRERIE
-# ========================================
+# Importazione delle librerie necessarie
 import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 from google.cloud import bigquery
 from google.oauth2 import service_account
-import warnings
-from datetime import datetime, timedelta
-import seaborn as sns
-from sklearn.cluster import KMeans
-from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report, confusion_matrix
-import scipy.stats as stats
-import matplotlib.pyplot as plt
-import io
-import base64
+import json
+import os
+import traceback
+import logging
+from datetime import datetime
 
-warnings.filterwarnings('ignore')
+# Configurazione del logging per tracciare errori e operazioni importanti
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# ========================================
-# CONFIGURAZIONE GLOBALE
-# ========================================
+# Configurazione delle costanti
 PROJECT_ID = "laboratorio-ai-460517"
 DATASET_ID = "dataset"
+CACHE_TTL = 300  # Tempo di cache in secondi
 
+# Configurazione della pagina Streamlit
 st.set_page_config(
-    page_title="Student Analytics Platform",
-    page_icon="📊",
+    page_title="🎓 Student Analytics Dashboard",
+    page_icon="🎓",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# ========================================
-# GESTIONE CONNESSIONE BIGQUERY (OTTIMIZZATA)
-# ========================================
+def check_credentials_file():
+    """
+    Verifica la presenza e la validità del file credentials.json.
+    Questo file è necessario per autenticarsi con Google Cloud.
+    """
+    try:
+        if not os.path.exists('credentials.json'):
+            st.error("❌ **File credentials.json non trovato!**")
+            st.info("📋 **Come risolvere:**")
+            st.write("1. Vai su Google Cloud Console")
+            st.write("2. IAM & Admin → Service Accounts")
+            st.write("3. Crea/scarica una nuova chiave JSON")
+            st.write("4. Rinomina il file in 'credentials.json'")
+            st.write("5. Metti il file nella stessa cartella di questo script")
+            return False
+
+        # Verifica che il file sia un JSON valido
+        with open('credentials.json', 'r') as f:
+            creds = json.load(f)
+            required_fields = ['type', 'project_id', 'private_key', 'client_email']
+            missing_fields = [field for field in required_fields if field not in creds]
+
+            if missing_fields:
+                st.error(f"❌ **Credenziali incomplete!** Mancano: {missing_fields}")
+                return False
+
+            if creds.get('project_id') != PROJECT_ID:
+                st.warning(f"⚠️ **Project ID diverso:** {creds.get('project_id')} vs {PROJECT_ID}")
+
+        st.success("✅ **File credentials.json trovato e valido**")
+        return True
+
+    except json.JSONDecodeError:
+        st.error("❌ **File credentials.json non è un JSON valido**")
+        return False
+    except Exception as e:
+        st.error(f"❌ **Errore nella verifica credenziali:** {str(e)}")
+        return False
 
 @st.cache_resource
-def get_bigquery_client():
-    """Inizializza client BigQuery con gestione errori migliorata."""
+def init_bigquery_client():
+    """
+    Inizializza il client BigQuery con gestione degli errori migliorata.
+    Utilizza le credenziali dal file credentials.json per autenticarsi.
+    """
     try:
-        credentials = service_account.Credentials.from_service_account_info(
-            st.secrets["gcp_service_account"]
+        # Verifica credenziali
+        if not check_credentials_file():
+            return None, "❌ Problema con le credenziali"
+
+        # Carica credenziali
+        credentials = service_account.Credentials.from_service_account_file(
+            'credentials.json',
+            scopes=["https://www.googleapis.com/auth/cloud-platform"]
         )
-        
+
+        # Crea client BigQuery
         client = bigquery.Client(credentials=credentials, project=PROJECT_ID)
-        
-        # Test connessione più robusto
-        test_query = f"SELECT table_name FROM `{PROJECT_ID}.{DATASET_ID}.INFORMATION_SCHEMA.TABLES` LIMIT 1"
-        client.query(test_query).result()
-        
-        return client
-        
-    except KeyError:
-        st.error("❌ Credenziali GCP non trovate nei secrets")
-        st.info("💡 Configura 'gcp_service_account' nei secrets di Streamlit")
-        return None
-    except Exception as e:
-        st.error(f"❌ Errore connessione BigQuery: {str(e)}")
-        return None
 
-@st.cache_data(ttl=600)
-def get_tables():
-    """Recupera lista tabelle con informazioni aggiuntive."""
-    client = get_bigquery_client()
+        # Test connessione semplice
+        test_query = "SELECT 1 as test_connection"
+        result = client.query(test_query).result()
+
+        # Verifica risultato
+        for row in result:
+            if row.test_connection == 1:
+                logger.info("✅ Connessione BigQuery stabilita")
+                return client, "✅ Connessione BigQuery OK"
+
+        return None, "❌ Test connessione fallito"
+
+    except Exception as e:
+        error_msg = f"❌ Errore BigQuery: {str(e)}"
+        logger.error(f"Errore dettagliato: {traceback.format_exc()}")
+        return None, error_msg
+
+@st.cache_data(ttl=CACHE_TTL)
+def get_all_tables():
+    """
+    Recupera tutte le tabelle dal dataset specificato in BigQuery.
+    Restituisce una lista di tabelle con informazioni dettagliate.
+    """
+    client, status = init_bigquery_client()
+
     if not client:
-        return []
-    
+        return [], status
+
+    try:
+        # Verifica dataset
+        dataset_ref = client.dataset(DATASET_ID)
+        dataset = client.get_dataset(dataset_ref)
+
+        # Lista tabelle
+        tables_list = list(client.list_tables(dataset_ref))
+
+        tables_info = []
+        for table in tables_list:
+            # Ottieni info dettagliate tabella
+            table_ref = dataset_ref.table(table.table_id)
+            table_obj = client.get_table(table_ref)
+
+            table_info = {
+                'id': table.table_id,
+                'name': table.table_id,
+                'type': classify_table_type(table.table_id),
+                'description': get_table_description(table.table_id),
+                'rows': table_obj.num_rows,
+                'size_mb': round(table_obj.num_bytes / (1024 * 1024), 2) if table_obj.num_bytes else 0,
+                'created': table_obj.created.strftime('%Y-%m-%d') if table_obj.created else 'N/A'
+            }
+            tables_info.append(table_info)
+
+        return sorted(tables_info, key=lambda x: x['id']), f"✅ Trovate {len(tables_info)} tabelle"
+
+    except Exception as e:
+        error_msg = f"❌ Errore nel recupero tabelle: {str(e)}"
+        logger.error(f"Errore get_all_tables: {traceback.format_exc()}")
+        return [], error_msg
+
+def classify_table_type(table_id):
+    """
+    Classifica il tipo di tabella in base al nome.
+    Utilizza emoji per rendere più intuitiva la classificazione.
+    """
+    table_lower = table_id.lower()
+    if 'churn' in table_lower:
+        return '🔮 Predizione'
+    elif 'cluster' in table_lower or 'kmeans' in table_lower:
+        return '🎯 Clustering'
+    elif 'soddisfazione' in table_lower:
+        return '😊 Soddisfazione'
+    elif 'feature' in table_lower:
+        return '⚙️ Features'
+    elif 'report' in table_lower:
+        return '📊 Report'
+    elif table_lower == 'studenti':
+        return '👥 Dati Base'
+    else:
+        return '📋 Altro'
+
+def get_table_description(table_id):
+    """
+    Ottiene una descrizione dettagliata della tabella in base al nome.
+    """
+    descriptions = {
+        'studenti': 'Dati anagrafici e performance degli studenti',
+        'studenti_churn_pred': 'Previsioni di abbandono scolastico con probabilità',
+        'studenti_cluster': 'Segmentazione degli studenti tramite clustering',
+        'studenti_soddisfazione_btr': 'Analisi della soddisfazione degli studenti',
+        'feature_importance_studenti': 'Importanza delle variabili nel modello predittivo',
+        'report_finale_soddisfazione_studenti': 'Report completo analisi soddisfazione',
+        'student_churn_rf': 'Modello Random Forest per previsione abbandoni',
+        'student_kmeans': 'Modello K-means per clustering comportamentale'
+    }
+    return descriptions.get(table_id, f'Tabella dati: {table_id}')
+
+@st.cache_data(ttl=CACHE_TTL)
+def load_table_data(table_id, limit=1000):
+    """
+    Carica i dati da una tabella specifica in BigQuery.
+    Restituisce un DataFrame pandas con i dati e un messaggio di stato.
+    """
+    client, _ = init_bigquery_client()
+
+    if not client:
+        return None, "❌ Client BigQuery non disponibile"
+
     try:
         query = f"""
-        SELECT 
-            table_name,
-            row_count,
-            size_bytes,
-            creation_time,
-            last_modified_time
-        FROM `{PROJECT_ID}.{DATASET_ID}.__TABLES__`
-        ORDER BY table_name
-        """
-        
-        result = client.query(query).to_dataframe()
-        return result.to_dict('records')
-        
-    except Exception as e:
-        # Fallback al metodo originale
-        try:
-            dataset_ref = client.get_dataset(f"{PROJECT_ID}.{DATASET_ID}")
-            tables = [{'table_name': table.table_id} for table in client.list_tables(dataset_ref)]
-            return tables
-        except Exception:
-            st.error(f"❌ Errore nel recupero delle tabelle: {str(e)}")
-            return []
-
-@st.cache_data(ttl=300)
-def load_table_data_optimized(table_name, limit=1000, offset=0, columns=None, where_clause=None):
-    """Versione ottimizzata del caricamento dati con filtri."""
-    client = get_bigquery_client()
-    if not client:
-        return None
-    
-    try:
-        # Costruisce SELECT dinamicamente
-        select_clause = "*" if not columns else ", ".join(columns)
-        where_sql = f"WHERE {where_clause}" if where_clause else ""
-        
-        query = f"""
-        SELECT {select_clause}
-        FROM `{PROJECT_ID}.{DATASET_ID}.{table_name}`
-        {where_sql}
-        ORDER BY 1
+        SELECT *
+        FROM `{PROJECT_ID}.{DATASET_ID}.{table_id}`
         LIMIT {limit}
-        OFFSET {offset}
         """
-        
-        # Configurazione job ottimizzata
-        job_config = bigquery.QueryJobConfig()
-        job_config.use_query_cache = True
-        job_config.maximum_bytes_billed = 500 * 1024 * 1024  # 500MB limit
-        
-        df = client.query(query, job_config=job_config).to_dataframe()
-        return df
-        
+
+        df = client.query(query).to_dataframe()
+
+        if df.empty:
+            return df, f"⚠️ Tabella {table_id} vuota"
+
+        return df, f"✅ Caricati {len(df):,} record da {table_id}"
+
     except Exception as e:
-        st.error(f"❌ Errore caricamento dati: {str(e)}")
-        return None
+        error_msg = f"❌ Errore nel caricamento {table_id}: {str(e)}"
+        logger.error(f"Errore load_table_data: {traceback.format_exc()}")
+        return None, error_msg
 
-# ========================================
-# FUNZIONI DI ANALISI AVANZATA
-# ========================================
+def render_tables_overview(tables):
+    """
+    Renderizza una panoramica delle tabelle disponibili nel dataset.
+    Mostra metriche generali e una tabella dettagliata con informazioni sulle tabelle.
+    """
+    st.header("📊 Tabelle Disponibili nel Dataset")
 
-def show_advanced_statistics(df):
-    """Analisi statistiche avanzate con test di ipotesi."""
-    st.subheader("📊 Statistiche Avanzate")
-    
-    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-    if len(numeric_cols) < 1:
-        st.warning("Nessuna colonna numerica per analisi avanzate")
+    if not tables:
+        st.warning("⚠️ Nessuna tabella trovata nel dataset")
         return
-    
-    tab1, tab2, tab3, tab4 = st.tabs(["Test Normalità", "Test Correlazione", "ANOVA", "Regressione"])
-    
+
+    # Metriche generali
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.metric("📋 Totale Tabelle", len(tables))
+
+    with col2:
+        total_rows = sum(t['rows'] for t in tables if t['rows'])
+        st.metric("📊 Totale Righe", f"{total_rows:,}")
+
+    with col3:
+        total_size = sum(t['size_mb'] for t in tables if t['size_mb'])
+        st.metric("💾 Dimensione Tot.", f"{total_size:.1f} MB")
+
+    with col4:
+        types = set(t['type'] for t in tables)
+        st.metric("🏷️ Tipi Diversi", len(types))
+
+    # Tabella dettagliata
+    st.subheader("🔍 Dettagli Tabelle")
+
+    df_tables = pd.DataFrame([{
+        'Tabella': t['name'],
+        'Tipo': t['type'],
+        'Descrizione': t['description'],
+        'Righe': f"{t['rows']:,}" if t['rows'] else 'N/A',
+        'Dimensione (MB)': f"{t['size_mb']:.2f}" if t['size_mb'] else 'N/A',
+        'Creata': t['created']
+    } for t in tables])
+
+    st.dataframe(df_tables, use_container_width=True, height=400)
+
+def render_data_analysis(df, table_info):
+    """
+    Renderizza un'analisi dettagliata dei dati.
+    Mostra metriche principali, informazioni sulle colonne, distribuzioni, correlazioni e grafici.
+    """
+    st.header(f"📈 Analisi: {table_info['description']}")
+
+    if df is None or df.empty:
+        st.warning("⚠️ Nessun dato da analizzare")
+        return
+
+    # Metriche principali
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.metric("📏 Righe", f"{len(df):,}")
+
+    with col2:
+        st.metric("📊 Colonne", len(df.columns))
+
+    with col3:
+        missing_pct = round(df.isnull().sum().sum() / (len(df) * len(df.columns)) * 100, 2)
+        st.metric("❓ Dati Mancanti", f"{missing_pct}%")
+
+    with col4:
+        memory_mb = round(df.memory_usage(deep=True).sum() / 1024 / 1024, 2)
+        st.metric("💾 Memoria", f"{memory_mb} MB")
+
+    # Tabs per analisi dettagliata
+    tab1, tab2, tab3, tab4 = st.tabs(["📋 Info Colonne", "📊 Distribuzione", "🔗 Correlazioni", "📈 Grafici"])
+
     with tab1:
-        st.write("**Test di Normalità (Shapiro-Wilk)**")
-        
-        selected_col = st.selectbox("Seleziona variabile:", numeric_cols, key="normality_test")
-        
-        if selected_col and len(df[selected_col].dropna()) > 3:
-            data = df[selected_col].dropna()
-            
-            # Limite campione per Shapiro-Wilk
-            if len(data) > 5000:
-                data = data.sample(5000)
-                st.info("Campione ridotto a 5000 osservazioni per il test")
-            
-            stat, p_value = stats.shapiro(data)
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("Statistica", f"{stat:.4f}")
-                st.metric("P-value", f"{p_value:.6f}")
-                
-                alpha = 0.05
-                if p_value > alpha:
-                    st.success("✅ I dati seguono una distribuzione normale")
-                else:
-                    st.warning("⚠️ I dati NON seguono una distribuzione normale")
-            
-            with col2:
-                # Q-Q plot
-                fig, ax = plt.subplots(figsize=(8, 6))
-                stats.probplot(data, dist="norm", plot=ax)
-                ax.set_title(f"Q-Q Plot - {selected_col}")
-                st.pyplot(fig)
-    
+        render_columns_info(df)
+
     with tab2:
-        st.write("**Test di Correlazione (Pearson)**")
-        
-        if len(numeric_cols) >= 2:
-            col1_select = st.selectbox("Prima variabile:", numeric_cols, key="corr_var1")
-            col2_select = st.selectbox("Seconda variabile:", 
-                                     [col for col in numeric_cols if col != col1_select], 
-                                     key="corr_var2")
-            
-            if col1_select and col2_select:
-                data1 = df[col1_select].dropna()
-                data2 = df[col2_select].dropna()
-                
-                # Prendi intersezione degli indici validi
-                valid_idx = data1.index.intersection(data2.index)
-                
-                if len(valid_idx) > 2:
-                    corr_coef, p_value = stats.pearsonr(data1[valid_idx], data2[valid_idx])
-                    
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.metric("Coefficiente di correlazione", f"{corr_coef:.4f}")
-                        st.metric("P-value", f"{p_value:.6f}")
-                        
-                        if p_value < 0.05:
-                            st.success("✅ Correlazione statisticamente significativa")
-                        else:
-                            st.warning("⚠️ Correlazione NON significativa")
-                    
-                    with col2:
-                        # Scatter plot
-                        fig = px.scatter(
-                            x=data1[valid_idx], 
-                            y=data2[valid_idx],
-                            title=f"Correlazione: {col1_select} vs {col2_select}",
-                            trendline="ols"
-                        )
-                        fig.update_xaxes(title=col1_select)
-                        fig.update_yaxes(title=col2_select)
-                        st.plotly_chart(fig, use_container_width=True)
-    
+        render_distribution_analysis(df)
+
     with tab3:
-        st.write("**Analisi della Varianza (ANOVA)**")
-        
-        cat_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
-        
-        if len(cat_cols) > 0 and len(numeric_cols) > 0:
-            numeric_var = st.selectbox("Variabile numerica:", numeric_cols, key="anova_numeric")
-            cat_var = st.selectbox("Variabile categorica:", cat_cols, key="anova_cat")
-            
-            if numeric_var and cat_var:
-                # Prepara dati per ANOVA
-                groups = []
-                group_names = []
-                
-                for group in df[cat_var].unique():
-                    if pd.notna(group):
-                        group_data = df[df[cat_var] == group][numeric_var].dropna()
-                        if len(group_data) > 0:
-                            groups.append(group_data)
-                            group_names.append(str(group))
-                
-                if len(groups) >= 2:
-                    try:
-                        f_stat, p_value = stats.f_oneway(*groups)
-                        
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            st.metric("F-statistica", f"{f_stat:.4f}")
-                            st.metric("P-value", f"{p_value:.6f}")
-                            
-                            if p_value < 0.05:
-                                st.success("✅ Differenze significative tra gruppi")
-                            else:
-                                st.warning("⚠️ Nessuna differenza significativa")
-                        
-                        with col2:
-                            # Box plot per gruppi
-                            fig = px.box(
-                                df, 
-                                x=cat_var, 
-                                y=numeric_var,
-                                title=f"Distribuzione {numeric_var} per {cat_var}"
-                            )
-                            st.plotly_chart(fig, use_container_width=True)
-                            
-                    except Exception as e:
-                        st.error(f"Errore nell'ANOVA: {str(e)}")
-        else:
-            st.info("Servono variabili numeriche e categoriche per l'ANOVA")
-    
+        render_correlation_analysis(df)
+
     with tab4:
-        st.write("**Regressione Lineare Semplice**")
-        
-        if len(numeric_cols) >= 2:
-            x_var = st.selectbox("Variabile indipendente (X):", numeric_cols, key="reg_x")
-            y_var = st.selectbox("Variabile dipendente (Y):", 
-                               [col for col in numeric_cols if col != x_var], 
-                               key="reg_y")
-            
-            if x_var and y_var:
-                # Rimuovi valori mancanti
-                reg_data = df[[x_var, y_var]].dropna()
-                
-                if len(reg_data) > 2:
-                    X = reg_data[x_var].values.reshape(-1, 1)
-                    y = reg_data[y_var].values
-                    
-                    # Calcola regressione
-                    slope, intercept, r_value, p_value, std_err = stats.linregress(
-                        reg_data[x_var], reg_data[y_var]
-                    )
-                    
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.metric("R²", f"{r_value**2:.4f}")
-                        st.metric("Pendenza", f"{slope:.4f}")
-                        st.metric("Intercetta", f"{intercept:.4f}")
-                        st.metric("P-value", f"{p_value:.6f}")
-                        
-                        # Equazione
-                        st.write(f"**Equazione:** y = {slope:.3f}x + {intercept:.3f}")
-                    
-                    with col2:
-                        # Grafico regressione
-                        fig = px.scatter(
-                            reg_data, 
-                            x=x_var, 
-                            y=y_var,
-                            title=f"Regressione: {y_var} ~ {x_var}",
-                            trendline="ols"
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
+        render_visualizations(df)
 
-def show_clustering_analysis(df):
-    """Analisi di clustering con K-means."""
-    st.subheader("🔍 Analisi di Clustering")
-    
-    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-    
-    if len(numeric_cols) < 2:
-        st.warning("Servono almeno 2 variabili numeriche per il clustering")
-        return
-    
-    # Selezione variabili
-    selected_vars = st.multiselect(
-        "Seleziona variabili per clustering:",
-        numeric_cols,
-        default=numeric_cols[:min(4, len(numeric_cols))]  # Max 4 di default
-    )
-    
-    if len(selected_vars) < 2:
-        st.info("Seleziona almeno 2 variabili")
-        return
-    
-    # Prepara dati
-    cluster_data = df[selected_vars].dropna()
-    
-    if len(cluster_data) < 10:
-        st.warning("Troppo pochi dati per clustering affidabile")
-        return
-    
-    # Normalizzazione
-    scaler = StandardScaler()
-    scaled_data = scaler.fit_transform(cluster_data)
-    
-    col1, col2 = st.columns([1, 2])
-    
-    with col1:
-        # Parametri clustering
-        st.write("**Parametri:**")
-        n_clusters = st.slider("Numero cluster:", 2, 10, 3)
-        
-        # Esegui clustering
-        kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
-        cluster_labels = kmeans.fit_predict(scaled_data)
-        
-        # Aggiungi labels al dataset
-        cluster_data_with_labels = cluster_data.copy()
-        cluster_data_with_labels['Cluster'] = cluster_labels
-        
-        # Statistiche cluster
-        st.write("**Statistiche Cluster:**")
-        cluster_counts = pd.Series(cluster_labels).value_counts().sort_index()
-        
-        for i, count in enumerate(cluster_counts):
-            st.write(f"Cluster {i}: {count} punti ({count/len(cluster_labels)*100:.1f}%)")
-        
-        # Inerzia (within-cluster sum of squares)
-        st.metric("Inerzia", f"{kmeans.inertia_:.2f}")
-    
-    with col2:
-        # Visualizzazione
-        if len(selected_vars) == 2:
-            # Scatter plot 2D
-            fig = px.scatter(
-                cluster_data_with_labels,
-                x=selected_vars[0],
-                y=selected_vars[1],
-                color='Cluster',
-                title="Clustering K-means",
-                color_discrete_sequence=px.colors.qualitative.Set1
-            )
-            
-            # Aggiungi centroidi
-            centroids_original = scaler.inverse_transform(kmeans.cluster_centers_)
-            
-            for i, centroid in enumerate(centroids_original):
-                fig.add_scatter(
-                    x=[centroid[0]],
-                    y=[centroid[1]],
-                    mode='markers',
-                    marker=dict(size=15, symbol='x', color='black'),
-                    name=f'Centroide {i}',
-                    showlegend=True
-                )
-            
-            st.plotly_chart(fig, use_container_width=True)
-            
+def render_columns_info(df):
+    """
+    Renderizza informazioni dettagliate sulle colonne del DataFrame.
+    Mostra il nome della colonna, il tipo di dato, il numero di valori nulli, il numero di valori unici e un esempio di valore.
+    """
+    st.subheader("📋 Informazioni Colonne")
+
+    col_info = []
+    for col in df.columns:
+        col_data = {
+            'Colonna': col,
+            'Tipo': str(df[col].dtype),
+            'Valori Nulli': f"{df[col].isnull().sum():,}",
+            'Valori Unici': f"{df[col].nunique():,}",
+            'Completezza %': f"{((len(df) - df[col].isnull().sum()) / len(df) * 100):.1f}%"
+        }
+
+        # Aggiungi esempio valore
+        if not df[col].dropna().empty:
+            example = str(df[col].dropna().iloc[0])
+            col_data['Esempio'] = example[:50] + "..." if len(example) > 50 else example
         else:
-            # PCA per visualizzazione multidimensionale
-            pca = PCA(n_components=2)
-            pca_data = pca.fit_transform(scaled_data)
-            
-            pca_df = pd.DataFrame({
-                'PC1': pca_data[:, 0],
-                'PC2': pca_data[:, 1],
-                'Cluster': cluster_labels
-            })
-            
-            fig = px.scatter(
-                pca_df,
-                x='PC1',
-                y='PC2',
-                color='Cluster',
-                title=f"Clustering K-means (PCA - {pca.explained_variance_ratio_.sum():.1%} varianza)",
-                color_discrete_sequence=px.colors.qualitative.Set1
-            )
-            
-            st.plotly_chart(fig, use_container_width=True)
-            
-            # Varianza spiegata
-            st.write(f"**Varianza spiegata PCA:** PC1: {pca.explained_variance_ratio_[0]:.1%}, "
-                    f"PC2: {pca.explained_variance_ratio_[1]:.1%}")
-    
-    # Metodo del gomito per determinare numero ottimale di cluster
-    st.write("**Metodo del Gomito:**")
-    
-    with st.expander("Analizza numero ottimale di cluster"):
-        max_k = min(10, len(cluster_data) // 2)
-        k_range = range(1, max_k + 1)
-        inertias = []
-        
-        for k in k_range:
-            kmeans_temp = KMeans(n_clusters=k, random_state=42, n_init=10)
-            kmeans_temp.fit(scaled_data)
-            inertias.append(kmeans_temp.inertia_)
-        
-        # Grafico del gomito
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=list(k_range),
-            y=inertias,
-            mode='lines+markers',
-            name='Inerzia'
-        ))
-        fig.update_layout(
-            title="Metodo del Gomito per K-means",
-            xaxis_title="Numero di Cluster (k)",
-            yaxis_title="Inerzia",
-            height=400
-        )
-        st.plotly_chart(fig, use_container_width=True)
+            col_data['Esempio'] = 'N/A'
 
-def show_prediction_analysis(df):
-    """Analisi predittiva con Random Forest."""
-    st.subheader("🎯 Analisi Predittiva")
-    
+        col_info.append(col_data)
+
+    df_info = pd.DataFrame(col_info)
+    st.dataframe(df_info, use_container_width=True, height=400)
+
+def render_distribution_analysis(df):
+    """
+    Renderizza un'analisi delle distribuzioni delle variabili numeriche e categoriche.
+    Mostra statistiche numeriche e grafici a barre per le variabili categoriche.
+    """
+    st.subheader("📊 Analisi Distribuzioni")
+
     numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-    cat_cols = df.select_dtypes(include=['object', 'category', 'bool']).columns.tolist()
-    
-    if len(numeric_cols) < 2:
-        st.warning("Servono almeno 2 variabili numeriche per analisi predittiva")
-        return
-    
-    col1, col2 = st.columns([1, 2])
-    
-    with col1:
-        st.write("**Configurazione Modello:**")
-        
-        # Selezione variabile target
-        target_var = st.selectbox(
-            "Variabile target (da predire):",
-            numeric_cols + cat_cols,
-            key="prediction_target"
-        )
-        
-        if not target_var:
-            return
-        
-        # Selezione features
-        available_features = [col for col in numeric_cols if col != target_var]
-        
-        selected_features = st.multiselect(
-            "Variabili predittive:",
-            available_features,
-            default=available_features[:min(5, len(available_features))]
-        )
-        
-        if len(selected_features) < 1:
-            st.info("Seleziona almeno una variabile predittiva")
-            return
-        
-        # Parametri del modello
-        test_size = st.slider("% dati per test:", 10, 40, 20) / 100
-        n_estimators = st.slider("Numero alberi:", 10, 200, 100)
-        
-    with col2:
-        # Prepara dati
-        model_data = df[selected_features + [target_var]].dropna()
-        
-        if len(model_data) < 50:
-            st.warning("Troppo pochi dati per modello affidabile (minimo 50)")
-            return
-        
-        X = model_data[selected_features]
-        y = model_data[target_var]
-        
-        # Determina tipo di problema
-        is_classification = (
-            y.dtype == 'object' or 
-            y.dtype == 'category' or 
-            y.dtype == 'bool' or
-            y.nunique() <= 10
-        )
-        
-        try:
-            if is_classification:
-                # Classificazione
-                X_train, X_test, y_train, y_test = train_test_split(
-                    X, y, test_size=test_size, random_state=42, stratify=y
-                )
-                
-                model = RandomForestClassifier(
-                    n_estimators=n_estimators,
-                    random_state=42,
-                    max_depth=10
-                )
-                model.fit(X_train, y_train)
-                
-                # Predizioni
-                y_pred = model.predict(X_test)
-                accuracy = model.score(X_test, y_test)
-                
-                st.success(f"**Accuratezza:** {accuracy:.3f}")
-                
-                # Matrice di confusione
-                cm = confusion_matrix(y_test, y_pred)
-                
-                fig = px.imshow(
-                    cm,
-                    text_auto=True,
-                    aspect="auto",
-                    title="Matrice di Confusione",
-                    labels=dict(x="Predetto", y="Reale")
-                )
-                st.plotly_chart(fig, use_container_width=True)
-                
-                # Report classificazione
-                with st.expander("Report Dettagliato"):
-                    report = classification_report(y_test, y_pred, output_dict=True)
-                    report_df = pd.DataFrame(report).transpose()
-                    st.dataframe(report_df.round(3))
-                
-            else:
-                # Regressione
-                from sklearn.ensemble import RandomForestRegressor
-                from sklearn.metrics import mean_squared_error, r2_score
-                
-                X_train, X_test, y_train, y_test = train_test_split(
-                    X, y, test_size=test_size, random_state=42
-                )
-                
-                model = RandomForestRegressor(
-                    n_estimators=n_estimators,
-                    random_state=42,
-                    max_depth=10
-                )
-                model.fit(X_train, y_train)
-                
-                # Predizioni
-                y_pred = model.predict(X_test)
-                
-                r2 = r2_score(y_test, y_pred)
-                rmse = np.sqrt(mean_squared_error(y_test, y_pred))
-                
-                col_a, col_b = st.columns(2)
-                with col_a:
-                    st.metric("R² Score", f"{r2:.3f}")
-                with col_b:
-                    st.metric("RMSE", f"{rmse:.3f}")
-                
-                # Grafico predizioni vs reali
-                fig = px.scatter(
-                    x=y_test,
-                    y=y_pred,
-                    title="Predizioni vs Valori Reali",
-                    labels={'x': 'Valori Reali', 'y': 'Predizioni'}
-                )
-                
-                # Linea perfetta
-                min_val = min(y_test.min(), y_pred.min())
-                max_val = max(y_test.max(), y_pred.max())
-                fig.add_shape(
-                    type="line",
-                    x0=min_val, y0=min_val,
-                    x1=max_val, y1=max_val,
-                    line=dict(dash="dash", color="red")
-                )
-                
-                st.plotly_chart(fig, use_container_width=True)
-            
-            # Importanza features
-            st.write("**Importanza Variabili:**")
-            
-            feature_importance = pd.DataFrame({
-                'Feature': selected_features,
-                'Importanza': model.feature_importances_
-            }).sort_values('Importanza', ascending=False)
-            
-            fig = px.bar(
-                feature_importance,
-                x='Importanza',
-                y='Feature',
-                orientation='h',
-                title="Importanza delle Variabili"
-            )
-            fig.update_layout(yaxis={'categoryorder': 'total ascending'})
-            st.plotly_chart(fig, use_container_width=True)
-            
-        except Exception as e:
-            st.error(f"Errore nel modello: {str(e)}")
+    cat_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
 
-# ========================================
-# CONTINUA DALL'ANALISI CORRELAZIONI (COMPLETAMENTO)
-# ========================================
+    # Statistiche numeriche
+    if numeric_cols:
+        st.write("**📈 Statistiche Variabili Numeriche:**")
+        st.dataframe(df[numeric_cols].describe(), use_container_width=True)
 
-def show_correlation_analysis(df):
-    """Analisi delle correlazioni tra variabili numeriche - COMPLETATA."""
-    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-    
-    if len(numeric_cols) < 2:
-        st.warning("⚠️ Servono almeno 2 variabili numeriche per l'analisi di correlazione")
-        return
-    
+    # Top valori categorici
+    if cat_cols:
+        st.write("**📊 Top Valori Variabili Categoriche:**")
+
+        selected_cat = st.selectbox("Seleziona variabile categorica:", cat_cols)
+        if selected_cat:
+            value_counts = df[selected_cat].value_counts().head(15)
+
+            col1, col2 = st.columns([2, 1])
+
+            with col1:
+                fig = px.bar(
+                    x=value_counts.values,
+                    y=value_counts.index,
+                    orientation='h',
+                    title=f'Top 15 valori - {selected_cat}'
+                )
+                fig.update_layout(height=500)
+                st.plotly_chart(fig, use_container_width=True)
+
+            with col2:
+                st.write("**Conteggi:**")
+                for val, count in value_counts.items():
+                    pct = (count / len(df)) * 100
+                    st.write(f"**{val}:** {count:,} ({pct:.1f}%)")
+
+def render_correlation_analysis(df):
+    """
+    Renderizza un'analisi delle correlazioni tra le variabili numeriche.
+    Mostra una matrice delle correlazioni e un elenco delle correlazioni più forti.
+    """
     st.subheader("🔗 Analisi Correlazioni")
-    
-    tab1, tab2, tab3 = st.tabs(["Matrice Correlazione", "Scatter Plots", "Correlazioni Forti"])
-    
-    with tab1:
-        corr_method = st.selectbox(
-            "Metodo di correlazione:",
-            ["pearson", "spearman", "kendall"],
-            help="Pearson: lineare, Spearman: monotonica, Kendall: più robusto"
-        )
-        
-        corr_matrix = df[numeric_cols].corr(method=corr_method)
-        
-        fig = px.imshow(
-            corr_matrix,
-            text_auto=True,
-            aspect="auto",
-            title=f"Matrice di Correlazione ({corr_method.title()})",
-            color_continuous_scale="RdBu_r",
-            zmin=-1,
-            zmax=1
-        )
-        fig.update_layout(height=600)
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Correlazioni forti
-        st.write("**Correlazioni più forti:**")
-        strong_corr = []
-        
-        for i in range(len(corr_matrix.columns)):
-            for j in range(i+1, len(corr_matrix.columns)):
-                if not pd.isna(corr_matrix.iloc[i, j]):
-                    strong_corr.append({
-                        'Variabile 1': corr_matrix.columns[i],
-                        'Variabile 2': corr_matrix.columns[j],
-                        'Correlazione': corr_matrix.iloc[i, j],
-                        'Forza': 'Forte' if abs(corr_matrix.iloc[i, j]) > 0.7 else 
-                                'Media' if abs(corr_matrix.iloc[i, j]) > 0.3 else 'Debole'
-                    })
-        
-        if strong_corr:
-            corr_df = pd.DataFrame(strong_corr)
-            corr_df = corr_df.sort_values('Correlazione', key=abs, ascending=False)
-            st.dataframe(corr_df.head(10), use_container_width=True)
-    
-    with tab2:
-        st.write("**Scatter Plot Interattivo**")
-        
-        col1, col2, col3 = st.columns(3)
-        
+
+    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+
+    if len(numeric_cols) < 2:
+        st.info("ℹ️ Servono almeno 2 variabili numeriche per l'analisi delle correlazioni")
+        return
+
+    # Matrice correlazioni
+    corr_matrix = df[numeric_cols].corr()
+
+    # Heatmap
+    fig = px.imshow(
+        corr_matrix,
+        title="Matrice delle Correlazioni",
+        color_continuous_scale="RdBu_r",
+        aspect="auto"
+    )
+    fig.update_layout(height=600)
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Top correlazioni
+    st.write("**🔝 Correlazioni più forti:**")
+
+    # Estrai correlazioni (escludendo diagonale)
+    correlations = []
+    for i in range(len(corr_matrix.columns)):
+        for j in range(i+1, len(corr_matrix.columns)):
+            correlations.append({
+                'Variabile 1': corr_matrix.columns[i],
+                'Variabile 2': corr_matrix.columns[j],
+                'Correlazione': corr_matrix.iloc[i, j]
+            })
+
+    # Ordina per valore assoluto
+    correlations_df = pd.DataFrame(correlations)
+    correlations_df['Abs_Corr'] = correlations_df['Correlazione'].abs()
+    correlations_df = correlations_df.sort_values('Abs_Corr', ascending=False).head(10)
+
+    st.dataframe(correlations_df[['Variabile 1', 'Variabile 2', 'Correlazione']], use_container_width=True)
+
+def render_visualizations(df):
+    """
+    Renderizza grafici e visualizzazioni per le variabili numeriche e categoriche.
+    Permette di selezionare più variabili per i grafici.
+    """
+    st.subheader("📈 Grafici e Visualizzazioni")
+
+    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+    cat_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+
+    # Istogrammi variabili numeriche
+    if numeric_cols:
+        st.write("**📊 Distribuzioni Numeriche:**")
+
+        selected_numeric = st.multiselect("Seleziona variabili numeriche:", numeric_cols)
+        if selected_numeric:
+            for col in selected_numeric:
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    fig = px.histogram(df, x=col, title=f'Istogramma - {col}')
+                    st.plotly_chart(fig, use_container_width=True)
+
+                with col2:
+                    fig = px.box(df, y=col, title=f'Box Plot - {col}')
+                    st.plotly_chart(fig, use_container_width=True)
+
+    # Scatter plot se ci sono almeno 2 variabili numeriche
+    if len(numeric_cols) >= 2:
+        st.write("**🎯 Scatter Plot:**")
+
+        col1, col2 = st.columns(2)
         with col1:
-            x_var = st.selectbox("Variabile X:", numeric_cols, key="scatter_x")
+            x_var = st.selectbox("Variabile X:", numeric_cols)
         with col2:
-            y_var = st.selectbox("Variabile Y:", 
-                               [col for col in numeric_cols if col != x_var], 
-                               key="scatter_y")
-        with col3:
-            color_var = st.selectbox("Colora per:", 
-                                   ["Nessuno"] + df.columns.tolist(), 
-                                   key="scatter_color")
-        
-        if x_var and y_var:
-            color_col = None if color_var == "Nessuno" else color_var
-            
-            fig = px.scatter(
-                df,
-                x=x_var,
-                y=y_var,
-                color=color_col,
-                title=f"Correlazione: {x_var} vs {y_var}",
-                trendline="ols"
-            )
-            
-            st.plotly_chart(fig, use_container_width=True)
-    
-    with tab3:
-        st.write("**Analisi Correlazioni Forti**")
-        
-        threshold = st.slider("Soglia correlazione:", 0.1, 0.9, 0.5, 0.1)
-        
-        strong_correlations = []
-        for i in range(len(corr_matrix.columns)):
-            for j in range(i+1, len(corr_matrix.columns)):
-                corr_val = corr_matrix.iloc[i, j]
-                if not pd.isna(corr_val) and abs(corr_val) >= threshold:
-                    strong_correlations.append({
-                        'Var1': corr_matrix.columns[i],
-                        'Var2': cor
+            y_vars = st.multiselect("Variabili Y:", [col for col in numeric_cols if col != x_var])
+
+        if x_var and y_vars:
+            for y_var in y_vars:
+                # Colore per variabile categorica se disponibile
+                color_var = None
+                if cat_cols:
+                    color_var = st.selectbox("Colore per:", ['Nessuno'] + cat_cols)
+                    if color_var == 'Nessuno':
+                        color_var = None
+
+                fig = px.scatter(df, x=x_var, y=y_var, color=color_var,
+                               title=f'Scatter Plot: {x_var} vs {y_var}')
+                st.plotly_chart(fig, use_container_width=True)
+
+def render_raw_data_viewer(df):
+    """
+    Renderizza un visualizzatore per i dati grezzi.
+    Permette di filtrare e scaricare i dati.
+    """
+    st.header("📋 Visualizzatore Dati Grezzi")
+
+    if df is None or df.empty:
+        st.warning("⚠️ Nessun dato da visualizzare")
+        return
+
+    # Filtri
+    st.subheader("🔍 Filtri")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        # Ricerca testuale
+        search_term = st.text_input("🔍 Cerca nei dati:")
+
+    with col2:
+        # Selezione colonne
+        all_columns = df.columns.tolist()
+        selected_columns = st.multiselect("📊 Seleziona colonne:", all_columns, default=all_columns[:10])
+
+    # Applica filtri
+    display_df = df.copy()
+
+    if search_term:
+        mask = df.astype(str).apply(lambda x: x.str.contains(search_term, case=False, na=False)).any(axis=1)
+        display_df = df[mask]
+        st.info(f"📊 Trovate {len(display_df):,} righe contenenti '{search_term}'")
+
+    if selected_columns:
+        display_df = display_df[selected_columns]
+
+    # Mostra dati
+    st.subheader(f"📊 Dati ({len(display_df):,} righe)")
+    st.dataframe(display_df, use_container_width=True, height=500)
+
+    # Download
+    if not display_df.empty:
+        csv = display_df.to_csv(index=False)
+        st.download_button(
+            label="📥 Scarica CSV",
+            data=csv,
+            file_name=f"export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            mime="text/csv"
+        )
+
+def main():
+    """
+    Funzione principale dell'app Streamlit.
+    Gestisce la connessione a BigQuery, il recupero delle tabelle e la visualizzazione dei dati.
+    """
+    st.title("🎓 Student Analytics Dashboard")
+    st.markdown("---")
+
+    # Sidebar
+    st.sidebar.header("⚙️ Configurazione")
+
+    # Inizializzazione BigQuery
+    with st.spinner("🔄 Connessione a BigQuery..."):
+        client, status = init_bigquery_client()
+
+    # Mostra status connessione
+    if "✅" in status:
+        st.sidebar.success(status)
+    else:
+        st.sidebar.error(status)
+        st.error("❌ **Impossibile connettersi a BigQuery**")
+        st.info("🔧 **Verifica:**")
+        st.write("1. File credentials.json presente")
+        st.write("2. Credenziali Google Cloud valide")
+        st.write("3. Permessi di accesso al progetto e dataset")
+        st.stop()
+
+    # Recupera tabelle
+    with st.spinner("📊 Recupero tabelle..."):
+        tables, table_status = get_all_tables()
+
+    if not tables:
+        st.error(f"❌ **Errore nel recupero tabelle:** {table_status}")
+        st.stop()
+
+    st.sidebar.success(f"✅ Trovate {len(tables)} tabelle")
+
+    # Selezione modalità
+    mode = st.sidebar.radio(
+        "📋 Modalità:",
+        ["🏠 Panoramica Tabelle", "🔍 Analisi Dettagliata"]
+    )
+
+    if mode == "🏠 Panoramica Tabelle":
+        render_tables_overview(tables)
+
+    else:  # Analisi Dettagliata
+        # Selezione tabella
+        table_options = {f"{t['type']} {t['name']}": t for t in tables}
+        selected_table_name = st.sidebar.selectbox("📊 Seleziona tabella:", list(table_options.keys()))
+        selected_table = table_options[selected_table_name]
+
+        # Limite righe
+        row_limit = st.sidebar.slider("📏 Limite righe:", 100, 5000, 1000, 100)
+
+        # Pulsante refresh
+        if st.sidebar.button("🔄 Aggiorna Cache"):
+            st.cache_data.clear()
+            st.rerun()
+
+        # Carica dati
+        with st.spinner(f"⏳ Caricamento {selected_table['name']}..."):
+            df, load_status = load_table_data(selected_table['id'], row_limit)
+
+        if "✅" in load_status:
+            st.success(load_status)
+        else:
+            st.error(load_status)
+
+        # Tabs per analisi
+        if df is not None and not df.empty:
+            tab1, tab2 = st.tabs(["📈 Analisi", "📋 Dati Grezzi"])
+
+            with tab1:
+                render_data_analysis(df, selected_table)
+
+            with tab2:
+                render_raw_data_viewer(df)
+
+    # Footer
+    st.markdown("---")
+    st.markdown(
+        "🎓 **Student Analytics Dashboard** | "
+        f"📊 Dataset: `{DATASET_ID}` | "
+        f"🏗️ Progetto: `{PROJECT_ID}`"
+    )
+
+if __name__ == "__main__":
+    main()
