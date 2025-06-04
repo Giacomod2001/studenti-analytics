@@ -379,18 +379,8 @@ def analyze_churn_predictions(df):
                             st.metric(col.replace('_', ' ').title(), val)
 
 def analyze_student_clusters(df):
-    """Analisi clustering studenti"""
+    """Analisi clustering studenti ottimizzata"""
     st.markdown('<h2 style="color: #1f77b4;">👥 Analisi Gruppi Studenti</h2>', unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div class="info-box">
-        <h4 style="margin:0;">💡 Come Funziona</h4>
-        <p style="margin:0.5rem 0;">
-            L'algoritmo raggruppa automaticamente studenti con caratteristiche simili.
-            Ogni gruppo ha bisogni diversi e richiede strategie educative personalizzate!
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
     
     # Trova colonna cluster
     cluster_cols = [col for col in df.columns if 'cluster' in col.lower()]
@@ -399,39 +389,82 @@ def analyze_student_clusters(df):
         return
     
     cluster_col = cluster_cols[0]
+    unique_clusters = sorted(df[cluster_col].unique())
     
-    # Statistiche cluster
-    cluster_counts = df[cluster_col].value_counts().sort_index()
+    # Statistiche rapide
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("👥 Totale Studenti", len(df))
+    with col2:
+        st.metric("🏷️ Numero Gruppi", len(unique_clusters))
+    with col3:
+        avg_size = len(df) // len(unique_clusters)
+        st.metric("📊 Dimensione Media", avg_size)
     
-    st.subheader("📊 Composizione Gruppi")
+    # Selector cluster
+    st.subheader("🎯 Scegli Gruppi da Confrontare")
+    selected_clusters = st.multiselect(
+        "Seleziona uno o più gruppi:",
+        options=unique_clusters,
+        default=unique_clusters[:2] if len(unique_clusters) >= 2 else unique_clusters,
+        format_func=lambda x: f"Gruppo {x}"
+    )
     
-    # Grafico a torta moderno
-    fig = px.pie(values=cluster_counts.values, 
-                names=[f'Gruppo {i}' for i in cluster_counts.index],
-                title='Distribuzione Studenti per Gruppo',
-                color_discrete_sequence=px.colors.qualitative.Set3)
-    fig.update_traces(textposition='inside', textinfo='percent+label')
-    st.plotly_chart(fig, use_container_width=True)
+    if not selected_clusters:
+        st.warning("Seleziona almeno un gruppo!")
+        return
     
-    # Caratteristiche per cluster
-    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-    if len(numeric_cols) > 1:
-        st.subheader("📈 Profilo dei Gruppi")
+    # Filtra dati
+    filtered_df = df[df[cluster_col].isin(selected_clusters)]
+    
+    # Analisi per ogni cluster
+    for cluster_id in selected_clusters:
+        cluster_data = filtered_df[filtered_df[cluster_col] == cluster_id]
         
-        cluster_profiles = df.groupby(cluster_col)[numeric_cols].mean().round(2)
+        st.markdown(f"### 🏷️ Gruppo {cluster_id}")
         
-        # Heatmap delle caratteristiche
-        fig = px.imshow(cluster_profiles.T, 
-                       title='Caratteristiche Medie per Gruppo',
-                       labels=dict(x="Gruppo", y="Caratteristica", color="Valore"),
-                       color_continuous_scale="RdYlBu_r")
-        st.plotly_chart(fig, use_container_width=True)
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("👥 Studenti", len(cluster_data))
+        with col2:
+            pct = (len(cluster_data) / len(df)) * 100
+            st.metric("📊 % del Totale", f"{pct:.1f}%")
         
-        # Tabella riassuntiva
-        st.dataframe(cluster_profiles, use_container_width=True)
+        # Caratteristiche principali
+        numeric_cols = cluster_data.select_dtypes(include=[np.number]).columns.tolist()
+        if len(numeric_cols) > 1:
+            with col3:
+                main_feature = numeric_cols[1]
+                avg_val = cluster_data[main_feature].mean()
+                st.metric(f"Avg {main_feature}", f"{avg_val:.2f}")
+        
+        st.markdown("---")
+    
+    # Grafico confronto
+    if len(selected_clusters) > 1:
+        st.subheader("📊 Confronto Cluster")
+        numeric_cols = filtered_df.select_dtypes(include=[np.number]).columns.tolist()
+        
+        if len(numeric_cols) >= 2:
+            col1, col2 = st.columns(2)
+            with col1:
+                x_var = st.selectbox("Variabile X:", numeric_cols, key="cluster_x")
+            with col2:
+                y_var = st.selectbox("Variabile Y:", [c for c in numeric_cols if c != x_var], key="cluster_y")
+            
+            fig = px.scatter(
+                filtered_df, 
+                x=x_var, 
+                y=y_var,
+                color=cluster_col,
+                title=f'{x_var} vs {y_var} per Cluster',
+                color_discrete_sequence=px.colors.qualitative.Set1
+            )
+            fig.update_layout(height=500)
+            st.plotly_chart(fig, use_container_width=True)
 
 def show_general_analysis(df, table_name):
-    """Analisi generale per qualsiasi tabella"""
+    """Analisi generale ottimizzata"""
     st.markdown(f'<h2 style="color: #1f77b4;">📈 Analisi: {table_name}</h2>', unsafe_allow_html=True)
     
     # Statistiche base
@@ -444,49 +477,20 @@ def show_general_analysis(df, table_name):
     with col3:
         missing = df.isnull().sum().sum()
         total = len(df) * len(df.columns)
-        st.metric("❓ Dati Mancanti", f"{(missing/total)*100:.1f}%")
+        st.metric("❓ Mancanti", f"{(missing/total)*100:.1f}%")
     with col4:
         numeric_cols = len(df.select_dtypes(include=[np.number]).columns)
         st.metric("🔢 Numeriche", numeric_cols)
     
-    # Tabs per diverse visualizzazioni
-    tab1, tab2, tab3 = st.tabs(["📊 Statistiche", "📈 Grafici", "🔍 Dati Raw"])
-    
-    with tab1:
-        show_statistics_tab(df)
-    
-    with tab2:
-        show_charts_tab(df)
-    
-    with tab3:
-        show_raw_data_tab(df)
-
-def show_statistics_tab(df):
-    """Tab statistiche"""
+    # Statistiche descrittive
     numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-    
     if numeric_cols:
         st.subheader("📊 Statistiche Descrittive")
         st.dataframe(df[numeric_cols].describe().round(2), use_container_width=True)
     
-    # Variabili categoriche
-    cat_cols = df.select_dtypes(include=['object']).columns.tolist()
-    if cat_cols:
-        st.subheader("📋 Distribuzione Variabili Categoriche")
-        selected_cat = st.selectbox("Seleziona variabile:", cat_cols)
-        
-        if selected_cat:
-            value_counts = df[selected_cat].value_counts().head(10)
-            fig = px.bar(x=value_counts.values, y=value_counts.index, 
-                        orientation='h', title=f'Top 10 - {selected_cat}')
-            st.plotly_chart(fig, use_container_width=True)
-
-def show_charts_tab(df):
-    """Tab grafici"""
-    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-    
+    # Grafici
     if len(numeric_cols) >= 2:
-        st.subheader("🎯 Analisi Relazioni")
+        st.subheader("📈 Analisi Grafica")
         
         col1, col2 = st.columns(2)
         with col1:
@@ -495,41 +499,12 @@ def show_charts_tab(df):
             y_var = st.selectbox("Asse Y:", [c for c in numeric_cols if c != x_var])
         
         if x_var and y_var:
-            fig = px.scatter(df, x=x_var, y=y_var, 
-                           title=f'{x_var} vs {y_var}',
-                           trendline="ols")
+            fig = px.scatter(df, x=x_var, y=y_var, title=f'{x_var} vs {y_var}')
             st.plotly_chart(fig, use_container_width=True)
-            
-            # Correlazione
-            corr = df[x_var].corr(df[y_var])
-            if abs(corr) > 0.7:
-                st.success(f"🔗 Correlazione forte: {corr:.3f}")
-            elif abs(corr) > 0.3:
-                st.info(f"🔗 Correlazione moderata: {corr:.3f}")
-            else:
-                st.warning(f"🔗 Correlazione debole: {corr:.3f}")
-
-def show_raw_data_tab(df):
-    """Tab dati grezzi"""
-    st.subheader("🔍 Esplora i Dati")
     
-    # Filtri
-    col1, col2 = st.columns(2)
-    with col1:
-        search = st.text_input("🔍 Cerca:")
-    with col2:
-        columns = st.multiselect("📊 Colonne:", df.columns.tolist(), default=df.columns.tolist()[:5])
-    
-    # Applica filtri
-    display_df = df.copy()
-    if search:
-        mask = df.astype(str).apply(lambda x: x.str.contains(search, case=False, na=False)).any(axis=1)
-        display_df = df[mask]
-    
-    if columns:
-        display_df = display_df[columns]
-    
-    st.dataframe(display_df, use_container_width=True, height=400)
+    # Dati raw
+    st.subheader("🔍 Dati Raw")
+    st.dataframe(df.head(100), use_container_width=True)
 
 # ========================================
 # APP PRINCIPALE
@@ -541,7 +516,7 @@ def main():
     if 'selected_table' not in st.session_state:
         st.session_state.selected_table = None
     
-    # Sidebar moderna
+    # Sidebar
     with st.sidebar:
         st.markdown("### ⚙️ Controllo Sistema")
         
@@ -550,60 +525,55 @@ def main():
         if connected:
             st.success("🟢 Sistema Online")
         else:
-            st.error("🔴 Sistema Offline")
-            st.info("💡 Verifica Streamlit Secrets")
-            return
+            st.error("🔴 Connessione Fallita")
+            st.stop()
         
-        # Carica tabelle
-        tables = load_table_list()
-        if tables:
-            st.info(f"📊 {len(tables)} tabelle disponibili")
-        else:
-            st.warning("⚠️ Nessuna tabella trovata")
-        
-        st.markdown("---")
-        
-        # Controlli navigazione
-        if st.button("🏠 Home", use_container_width=True):
+        # Pulsante reset
+        if st.button("🔄 Reset Vista", use_container_width=True):
             st.session_state.analysis_mode = False
             st.session_state.selected_table = None
             st.rerun()
         
-        if st.session_state.analysis_mode:
-            if st.button("← Indietro", use_container_width=True):
-                st.session_state.analysis_mode = False
-                st.session_state.selected_table = None
-                st.rerun()
+        # Info sistema
+        st.markdown("---")
+        st.markdown("### 📊 Info Sistema")
+        st.info(f"**Progetto:** {PROJECT_ID}\n**Dataset:** {DATASET_ID}")
     
-    # Contenuto principale
-    if not st.session_state.analysis_mode:
-        # Home page
-        show_welcome_screen()
+    # Carica tabelle
+    tables = load_table_list()
+    
+    if not tables:
+        st.error("❌ Nessuna tabella trovata")
+        return
+    
+    # Modalità analisi
+    if st.session_state.analysis_mode and st.session_state.selected_table:
+        # Pulsante indietro
+        if st.button("← Torna alla Dashboard", key="back_btn"):
+            st.session_state.analysis_mode = False
+            st.session_state.selected_table = None
+            st.rerun()
         
-        if tables:
-            st.markdown("---")
-            show_metrics_dashboard(tables)
-            st.markdown("---")
-            show_table_explorer(tables)
-    
-    else:
-        # Modalità analisi
-        if st.session_state.selected_table:
-            table_id = st.session_state.selected_table
+        # Carica e analizza dati
+        with st.spinner("🔄 Caricamento dati..."):
+            df = load_data(st.session_state.selected_table)
+        
+        if df is not None:
+            table_name = get_display_name(st.session_state.selected_table)
+            table_type = get_table_type(st.session_state.selected_table)
             
-            with st.spinner(f"📥 Caricamento dati da {table_id}..."):
-                df = load_data(table_id)
-            
-            if df is not None:
-                # Analisi specifica per tipo tabella
-                if 'churn' in table_id.lower():
-                    analyze_churn_predictions(df)
-                elif 'cluster' in table_id.lower():
-                    analyze_student_clusters(df)
-                else:
-                    show_general_analysis(df, get_display_name(table_id))
+            # Analisi specifica per tipo
+            if table_type == 'prediction':
+                analyze_churn_predictions(df)
+            elif table_type == 'clustering':
+                analyze_student_clusters(df)
             else:
-                st.error("❌ Impossibile caricare i dati")
+                show_general_analysis(df, table_name)
+    else:
+        # Homepage
+        show_welcome_screen()
+        show_metrics_dashboard(tables)
+        show_table_explorer(tables)
 
 if __name__ == "__main__":
     main()
