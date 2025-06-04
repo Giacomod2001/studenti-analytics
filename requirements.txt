@@ -1,6 +1,19 @@
-streamlit
-pandas
-numpy
-plotly
-google-cloud-bigquery
-db-dtypes
+# Streamlit core
+streamlit>=1.28.0
+
+# Data manipulation and analysis
+pandas>=1.5.0
+numpy>=1.24.0
+
+# Visualization
+plotly>=5.15.0
+
+# Google Cloud BigQuery
+google-cloud-bigquery>=3.11.0
+google-auth>=2.17.0
+google-auth-oauthlib>=1.0.0
+google-auth-httplib2>=0.1.0
+
+# Additional dependencies that might be needed
+pyarrow>=10.0.0  # For BigQuery data transfer optimization
+db-dtypes>=1.0.0  # For BigQuery specific data types
