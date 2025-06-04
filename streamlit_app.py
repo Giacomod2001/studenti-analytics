@@ -23,6 +23,96 @@ logger = logging.getLogger(__name__)
 PROJECT_ID = "laboratorio-ai-460517"
 DATASET_ID = "dataset"
 
+# ─── 2) MAPPA DELLE DESCRIZIONI E ORIGINI DEI DATI ───────────────────────────────
+
+# Descrizioni “uman‐readable” di ogni tabella presenti in BigQuery
+TABLE_DESCRIPTIONS = {
+    "studenti": "Dati anagrafici e performance degli studenti",
+    "studenti_churn_pred": "Previsioni di abbandono scolastico con probabilità",
+    "studenti_cluster": "Segmentazione degli studenti tramite clustering",
+    "studenti_soddisfazione_btr": "Analisi della soddisfazione degli studenti",
+    "feature_importance_studenti": "Importanza delle variabili nel modello predittivo",
+    "report_finale_soddisfazione_studenti": "Report completo analisi soddisfazione",
+    "student_churn_rf": "Modello Random Forest per previsione abbandoni",
+    "student_kmeans": "Modello K-means per clustering comportamentale"
+}
+
+# Spiegazione di come sono stati generati i dati per ogni tabella (pipeline e algoritmi)
+TABLE_ORIGINS = {
+    "studenti": (
+        "**Origine:**\n\n"
+        "La tabella `studenti` raccoglie le informazioni anagrafiche e le metriche di performance di ogni studente.\n"
+        "I dati di partenza derivano dal sistema di gestione dell’università (registro studenti, voti, esami sostenuti, ecc.).\n"
+        "Prima di caricarli in BigQuery, è stato effettuato un processo di pulizia e normalizzazione dei campi (nell'ambito di un ETL dedicato):\n"
+        "- Rimozione dei record duplicati\n"
+        "- Uniformazione dei formati di data e stringa\n"
+        "- Calcolo di new features derivate (ad esempio, media voti, numero di esami sostenuti)\n"
+    ),
+    "studenti_churn_pred": (
+        "**Origine:**\n\n"
+        "Questa tabella contiene le previsioni di abbandono scolastico (churn) generate da un modello di Machine Learning di tipo Random Forest.\n"
+        "**Passaggi principali della pipeline:**\n"
+        "1. Caricamento e pulizia dati da `studenti` e tabelle correlate.\n"
+        "2. Feature engineering: selezione e trasformazione delle variabili più rilevanti (ad esempio: media dei voti, ore di studio, partecipazione a eventi).\n"
+        "3. Suddivisione del dataset in training e test set.\n"
+        "4. Addestramento di un modello Random Forest (`student_churn_rf`) con ottimizzazione dei parametri (cross‐validation).\n"
+        "5. Calcolo delle probabilità di churn per ogni studente (es. colonna `prob_churn`).\n"
+        "6. Salvataggio dei risultati in questa tabella, con probabilità e classe predetta (churn sì/no).\n"
+    ),
+    "student_churn_rf": (
+        "**Origine:**\n\n"
+        "Questa tabella contiene i risultati e le metriche sul modello di Random Forest utilizzato per la predizione del churn.\n"
+        "Ogni riga corrisponde a una metrica di performance (ad esempio, accuracy, precision, recall) misurata sul test set, così come i parametri ottimali del modello.\n"
+        "Viene creata durante la fase di validazione del modello, dopo aver eseguito hyperparameter tuning e misurato le prestazioni finali su un set di hold‐out.\n"
+    ),
+    "feature_importance_studenti": (
+        "**Origine:**\n\n"
+        "Questa tabella mostra l'importanza delle variabili (feature importance) estratte dal modello di Random Forest `student_churn_rf`.\n"
+        "Per ogni caratteristica (`caratteristica`), sono riportati:\n"
+        "- `peso_importanza`: il numero di volte in cui la feature è stata scelta per una suddivisione in alberi del modello.\n"
+        "- `guadagno_informazione`: la somma dell’informazione guadagnata, che indica quanto la feature ha contribuito a ridurre l'impurità.\n"
+        "- `copertura`: il numero totale di esempi nel dataset che sono passati da un nodo che ha usato quella feature.\n"
+        "- `percentuale_importanza`: peso normalizzato su 100.\n"
+        "- `categoria_importanza`: categoria qualitativa (Ad esempio: "Molto Importante", "Moderatamente Importante", "Poco Importante").\n"
+        "\n"
+        "La tabella è stata generata direttamente dal meccanismo `feature_importances_` di scikit‐learn, salvando poi i dettagli in BigQuery.\n"
+    ),
+    "studenti_cluster": (
+        "**Origine:**\n\n"
+        "La tabella `studenti_cluster` contiene l’assegnazione di ogni studente a un cluster, ottenuto tramite l'algoritmo K‐means.\n"
+        "**Passaggi principali:**\n"
+        "1. Selezione delle feature numeriche più significative (ad esempio: ore di studio settimanali, media voti, numero di assenze).\n"
+        "2. Standardizzazione delle variabili (scaling) in modo che abbiano media = 0 e varianza = 1.\n"
+        "3. Addestramento dell’algoritmo K‐means con K=4 (4 cluster): scelta del numero di cluster effettuata tramite metodo del gomito (elbow method).\n"
+        "4. Calcolo del centroide per ogni cluster e assegnazione della label `cluster_id` a ciascuno studente.\n"
+        "5. Salvataggio di `cluster_id`, coordinate dei centroidi e distance‐to‐centroid per ogni studente.\n"
+    ),
+    "student_kmeans": (
+        "**Origine:**\n\n"
+        "Questa tabella contiene i dettagli dell’algoritmo K‐means (K=4) usato per il clustering degli studenti.\n"
+        "Comprende:\n"
+        "- I valori dei centroidi (coordinate) per ogni cluster.\n"
+        "- Il valore di inertia per ogni iterazione (utile per diagnosticare la convergenza).\n"
+        "Viene generata mentre si addestra il modello di clustering, e permette di analizzare la qualità della suddivisione.\n"
+    ),
+    "studenti_soddisfazione_btr": (
+        "**Origine:**\n\n"
+        "Questa tabella raccoglie i risultati di un’analisi basata su un modello di regressione Bayesiana o Boosted Tree (ad esempio, XGBoost) per stimare il livello di soddisfazione degli studenti.\n"
+        "**Passaggi principali:**\n"
+        "1. Raccolta dei questionari di soddisfazione compilati dagli studenti.\n"
+        "2. Ricodifica delle risposte (scale Likert 1‐5) e pulizia dei dati.\n"
+        "3. Creazione di feature descrittive (ad es. numero di eventi frequentati, media voti, reddito familiare).\n"
+        "4. Addestramento di un modello di regressione (Boosted Tree) per predire il punteggio di soddisfazione.\n"
+        "5. Calcolo delle metriche di performance (R², RMSE) su un hold‐out set.\n"
+        "6. Salvataggio dei risultati nella tabella, con stima di punteggio, intervalli di confidenza e feature più influenti.\n"
+    ),
+    "report_finale_soddisfazione_studenti": (
+        "**Origine:**\n\n"
+        "Questo report riassume l’analisi di soddisfazione degli studenti, basato sui risultati di `studenti_soddisfazione_btr`.\n"
+        "Include grafici di distribuzione dei punteggi, confronto tra corsi di laurea e cluster di studenti, e suggerimenti per migliorare l’esperienza studentesca.\n"
+        "Viene generato automaticamente con uno script Python che imposta diverse viste (view) in BigQuery e produce un PDF/HTML di output.\n"
+    )
+}
 
 # ─── 2) FUNZIONE DI INIZIALIZZAZIONE DEL CLIENT BIGQUERY ─────────────────────────
 
@@ -71,7 +161,6 @@ def init_bigquery_client():
         logger.error(f"Errore BigQuery: {detailed}")
         return None, f"❌ Errore BigQuery: {str(e)}"
 
-
 # ─── 3) FUNZIONE PER RECUPERARE METADATI SULLE TABELLE ────────────────────────────
 
 @st.cache_data(ttl=300)
@@ -103,7 +192,7 @@ def get_all_tables():
             tables_info.append({
                 "id": table.table_id,
                 "name": table.table_id,
-                "description": get_table_description(table.table_id),
+                "description": TABLE_DESCRIPTIONS.get(table.table_id, f"Tabella dati: {table.table_id}"),
                 "rows": table_obj.num_rows,
                 "size_mb": round(table_obj.num_bytes / (1024 * 1024), 2) if table_obj.num_bytes else 0,
                 "created": table_obj.created.strftime("%Y-%m-%d") if table_obj.created else "N/A"
@@ -116,25 +205,6 @@ def get_all_tables():
         detailed = traceback.format_exc()
         logger.error(f"Errore get_all_tables: {detailed}")
         return [], f"❌ Errore nel recupero tabelle: {str(e)}"
-
-
-def get_table_description(table_id: str) -> str:
-    """
-    Ritorna una descrizione testuale in base al nome della tabella.
-    Se non è riconosciuta, restituisce "Tabella dati: {table_id}".
-    """
-    descriptions = {
-        "studenti": "Dati anagrafici e performance degli studenti",
-        "studenti_churn_pred": "Previsioni di abbandono scolastico",
-        "studenti_cluster": "Clusterizzazione degli studenti",
-        "studenti_soddisfazione_btr": "Analisi soddisfazione studenti",
-        "feature_importance_studenti": "Importanza variabili nel modello",
-        "report_finale_soddisfazione_studenti": "Report soddisfazione completo",
-        "student_churn_rf": "Modello Random Forest (churn)",
-        "student_kmeans": "Modello K-means (cluster)"
-    }
-    return descriptions.get(table_id, f"Tabella dati: {table_id}")
-
 
 # ─── 4) FUNZIONE PER CARICARE TUTTI I DATI DI UNA TABELLA ─────────────────────────
 
@@ -161,7 +231,6 @@ def load_full_table(table_id: str) -> (pd.DataFrame, str):
         detailed = traceback.format_exc()
         logger.error(f"Errore load_full_table: {detailed}")
         return None, f"❌ Errore nel caricamento {table_id}: {str(e)}"
-
 
 # ─── 5) FUNZIONI DI RENDERING / VISUALIZZAZIONE DEI DATI ─────────────────────────
 
@@ -208,18 +277,35 @@ def render_overview(tables_info: list):
 def render_table_inspection(df: pd.DataFrame, table_info: dict):
     """
     Mostra:
-    1. Intestazione con nome tabella e descrizione
-    2. Metriche base: numero righe, colonne, percentuale missing, memoria
-    3. Anteprima (prime 20 righe)
-    4. Selezione colonne da includere/visualizzare
-    5. Grafici base: distribuzioni (istogrammi) e correlazioni (heatmap)
-    6. Sezione “Dati Grezzi e Download” con filtro testuale
+    1. Spiegazione breve dell’origine dei dati e dell’algoritmo utilizzato
+    2. Intestazione con nome tabella e descrizione
+    3. Metriche base: numero righe, colonne, percentuale missing, memoria
+    4. Anteprima (prime 20 righe)
+    5. Selezione colonne da includere/visualizzare
+    6. Grafici base: distribuzioni (istogrammi) e correlazioni (heatmap)
+    7. Sezione “Dati Grezzi e Download” con filtro testuale
     """
+    # ─── 5.0) SPIEGAZIONE BREVE DELL'ORIGINE DEI DATI E ALGORTIMI ───────────────────
+    st.subheader("📖 Origine dei Dati e Algoritmi Utilizzati")
+    origin_text = TABLE_ORIGINS.get(
+        table_info["id"],
+        (
+            "Questa tabella contiene dati generati durante le varie fasi di analisi e modellazione.\n\n"
+            "- Dati di partenza: informazioni base sugli studenti (anagrafica, voti, esami, ecc.).\n"
+            "- Preprocessing: pulizia, normalizzazione e creazione di nuove feature.\n"
+            "- Modelli di ML: a seconda della tabella, si usano algoritmi di tipo Random Forest (per churn) o K-means (per clustering),\n"
+            "  o modelli di regressione Boosted Tree (per soddisfazione).\n"
+            "- Salvataggio: i risultati vengono memorizzati in BigQuery per consentire visualizzazione e download.\n\n"
+            "Controlla la sezione “Spiegazione Tabelle” nella sidebar per dettagli specifici su ogni tabella."
+        )
+    )
+    st.markdown(origin_text)
+    st.markdown("---")
+
+    # ─── 5.1) INTESTAZIONE E METRICHE BASE SUI DATI ─────────────────────────────────
     st.title(f"📈 Analisi: {table_info['description']}")
 
-    # ─── 5.1) METRICHE BASE ────────────────────────────────────────────────────────
     st.markdown("### 📏 Metriche Generali")
-
     col_r, col_c, col_m, col_mem = st.columns(4)
     col_r.metric("Righe Totali", f"{len(df):,}")
     col_c.metric("Colonne Totali", f"{len(df.columns)}")
@@ -232,7 +318,6 @@ def render_table_inspection(df: pd.DataFrame, table_info: dict):
 
     # ─── 5.2) ANTEPRIMA E SELEZIONE COLONNE ─────────────────────────────────────────
     st.subheader("🔍 Anteprima e Selezione Colonne")
-
     st.write("**Anteprima (prime 20 righe):**")
     st.dataframe(df.head(20), use_container_width=True, height=240)
 
@@ -342,10 +427,11 @@ def main():
     else:
         st.sidebar.success(tables_status)
 
-    # ─── 6.3) SPIEGAZIONE DI OGNI TABELLA NELLA SIDEBAR ────────────────────────────
+    # ─── 6.3) “Spiegazione Tabelle” NELLA SIDEBAR ─────────────────────────────────
     with st.sidebar.expander("📖 Spiegazione Tabelle", expanded=False):
         for t in tables_info:
-            st.markdown(f"**{t['name']}**: {t['description']}")
+            descr = TABLE_DESCRIPTIONS.get(t["id"], f"Tabella dati: {t['id']}")
+            st.markdown(f"**{t['name']}**: {descr}")
 
     # ─── 6.4) SELEZIONE DELLA TABELLA ─────────────────────────────────────────────
     st.sidebar.markdown("---")
