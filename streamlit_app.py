@@ -1,20 +1,24 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import plotly.express as px
 from google.cloud import bigquery
 from google.oauth2 import service_account
 
-# Configurazione
-PROJECT_ID = "laboratorio-ai-460517"
-DATASET_ID = "dataset"
-
-# Configurazione della pagina Streamlit
+# Configurazione della pagina
 st.set_page_config(
-    page_title="Student Analytics",
+    page_title="Student Analytics Dashboard",
     page_icon="📊",
     layout="wide"
 )
+
+# Titolo della dashboard
+st.title("Student Analytics Dashboard")
+
+# Descrizione della dashboard
+st.markdown("""
+Questa dashboard è progettata per aiutare le università a comprendere la soddisfazione degli studenti,
+i fattori che influenzano questa soddisfazione e il rischio di abbandono dei corsi di studio.
+""")
 
 # Funzione per ottenere il client BigQuery
 @st.cache_resource
@@ -23,256 +27,147 @@ def get_bigquery_client():
         credentials = service_account.Credentials.from_service_account_info(
             st.secrets["gcp_service_account"]
         )
-        client = bigquery.Client(credentials=credentials, project=PROJECT_ID)
+        client = bigquery.Client(credentials=credentials, project=credentials.project_id)
         return client
     except Exception as e:
         st.error(f"Errore nella connessione a BigQuery: {e}")
         return None
 
-# Funzione per ottenere l'elenco delle tabelle
-@st.cache_data(ttl=600)
-def get_tables():
+# Funzione per caricare i dati da BigQuery
+@st.cache_data
+def load_data(query):
     client = get_bigquery_client()
-    if not client:
-        return []
+    if client:
+        try:
+            query_job = client.query(query)
+            data = query_job.to_dataframe()
+            return data
+        except Exception as e:
+            st.error(f"Errore nell'esecuzione della query: {e}")
+            return None
+    return None
 
-    try:
-        dataset = client.get_dataset(f"{PROJECT_ID}.{DATASET_ID}")
-        tables = [table.table_id for table in client.list_tables(dataset)]
-        return tables
-    except Exception as e:
-        st.error(f"Errore nel recupero delle tabelle: {e}")
-        return []
+# Query per ottenere i dati
+query = """
+SELECT
+    student_id,
+    soddisfazione,
+    abbandono,
+    partecipazione_eventi,
+    ore_studio_settimanali,
+    media_voti,
+    corso_di_studi,
+    anno_iscrizione
+FROM `laboratorio-ai-460517.dataset.studenti`
+LIMIT 1000
+"""
 
-# Funzione per caricare i dati da una tabella
-@st.cache_data(ttl=300)
-def load_table_data(table_name, limit=1000):
-    client = get_bigquery_client()
-    if not client:
-        return None
+# Caricamento dei dati
+data = load_data(query)
 
-    try:
-        query = f"""
-        SELECT * FROM `{PROJECT_ID}.{DATASET_ID}.{table_name}`
-        LIMIT {limit}
-        """
-        df = client.query(query).to_dataframe()
-        return df
-    except Exception as e:
-        st.error(f"Errore nel caricamento dei dati: {e}")
-        return None
+if data is not None:
+    # Sidebar per la selezione delle variabili
+    st.sidebar.header("Filtri")
 
-# Funzione per eseguire una query personalizzata
-@st.cache_data(ttl=300)
-def execute_custom_query(query):
-    client = get_bigquery_client()
-    if not client:
-        return None
+    # Selezione delle variabili numeriche
+    numeric_columns = data.select_dtypes(include=['int64', 'float64']).columns.tolist()
+    selected_numeric_columns = st.sidebar.multiselect("Seleziona variabili numeriche", numeric_columns, default=numeric_columns)
 
-    try:
-        df = client.query(query).to_dataframe()
-        return df
-    except Exception as e:
-        st.error(f"Errore nell'esecuzione della query: {e}")
-        return None
+    # Selezione delle variabili categoriche
+    categorical_columns = data.select_dtypes(include=['object']).columns.tolist()
+    selected_categorical_columns = st.sidebar.multiselect("Seleziona variabili categoriche", categorical_columns, default=categorical_columns)
 
-# Funzione per mostrare le statistiche di base
-def show_basic_stats(df):
-    st.subheader("Statistiche di Base")
+    # Filtro per corso di studi
+    selected_corso = st.sidebar.selectbox("Seleziona corso di studi", data['corso_di_studi'].unique())
+
+    # Filtro per anno di iscrizione
+    selected_anno = st.sidebar.selectbox("Seleziona anno di iscrizione", data['anno_iscrizione'].unique())
+
+    # Applicazione dei filtri
+    filtered_data = data[(data['corso_di_studi'] == selected_corso) & (data['anno_iscrizione'] == selected_anno)]
+
+    # Sezione KPI
+    st.header("Indicatori Chiave di Prestazione (KPI)")
+
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("Numero di righe", len(df))
+        st.subheader("Soddisfazione Media")
+        st.write(f"{filtered_data['soddisfazione'].mean():.2f}/10")
+        st.markdown("**Descrizione**: Questo indicatore mostra la soddisfazione media degli studenti.")
     with col2:
-        st.metric("Numero di colonne", len(df.columns))
+        st.subheader("Tasso di Abbandono")
+        st.write(f"{filtered_data['abbandono'].mean():.2%}")
+        st.markdown("**Descrizione**: Questo indicatore mostra il tasso medio di abbandono.")
     with col3:
-        missing = df.isnull().sum().sum()
-        st.metric("Valori mancanti", missing)
+        st.subheader("Partecipazione agli Eventi")
+        st.write(f"{filtered_data['partecipazione_eventi'].mean():.2f}/10")
+        st.markdown("**Descrizione**: Questo indicatore mostra la partecipazione media agli eventi.")
 
-# Funzione per mostrare l'anteprima dei dati
-def show_data_preview(df):
-    st.subheader("Anteprima dei Dati")
-    st.dataframe(df.head(20))
+    # Sezione Grafici
+    st.header("Analisi Dettagliata")
 
-# Funzione per mostrare le informazioni sulle colonne
-def show_column_info(df):
-    st.subheader("Informazioni sulle Colonne")
-    info_data = []
-    for col in df.columns:
-        info_data.append({
-            'Colonna': col,
-            'Tipo': str(df[col].dtype),
-            'Non-null': df[col].count(),
-            'Null': df[col].isnull().sum(),
-            'Unici': df[col].nunique()
-        })
-    info_df = pd.DataFrame(info_data)
-    st.dataframe(info_df)
+    # Grafico della soddisfazione degli studenti
+    st.subheader("Soddisfazione degli Studenti")
+    fig_soddisfazione = px.histogram(filtered_data, x='soddisfazione', title="Distribuzione della Soddisfazione degli Studenti")
+    st.plotly_chart(fig_soddisfazione)
+    st.markdown("**Interpretazione**: Questo grafico mostra la distribuzione della soddisfazione degli studenti.")
 
-# Funzione per mostrare l'analisi delle variabili numeriche
-def show_numeric_analysis(df):
-    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-    if not numeric_cols:
-        st.warning("Nessuna colonna numerica trovata")
-        return
+    # Grafico del tasso di abbandono
+    st.subheader("Tasso di Abbandono")
+    fig_abbandono = px.histogram(filtered_data, x='abbandono', title="Distribuzione del Tasso di Abbandono")
+    st.plotly_chart(fig_abbandono)
+    st.markdown("**Interpretazione**: Questo grafico mostra la distribuzione del tasso di abbandono.")
 
-    st.subheader("Analisi delle Variabili Numeriche")
-    st.write("**Statistiche Descrittive**")
-    st.dataframe(df[numeric_cols].describe())
+    # Grafico della partecipazione agli eventi
+    st.subheader("Partecipazione agli Eventi")
+    fig_partecipazione = px.histogram(filtered_data, x='partecipazione_eventi', title="Distribuzione della Partecipazione agli Eventi")
+    st.plotly_chart(fig_partecipazione)
+    st.markdown("**Interpretazione**: Questo grafico mostra la distribuzione della partecipazione agli eventi.")
 
-    if len(numeric_cols) > 0:
-        st.write("**Distribuzione delle Variabili**")
-        selected_col = st.selectbox("Seleziona colonna:", numeric_cols, key="numeric_dist")
-        fig = px.histogram(df, x=selected_col, title=f"Distribuzione di {selected_col}")
-        st.plotly_chart(fig, use_container_width=True)
+    # Sezione Analisi delle Correlazioni
+    st.header("Analisi delle Correlazioni")
 
-# Funzione per mostrare l'analisi delle variabili categoriche
-def show_categorical_analysis(df):
-    cat_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
-    if not cat_cols:
-        st.warning("Nessuna colonna categorica trovata")
-        return
+    # Matrice di correlazione
+    st.subheader("Matrice di Correlazione")
+    corr_matrix = filtered_data[selected_numeric_columns].corr()
+    fig_corr = px.imshow(corr_matrix, text_auto=True, aspect="auto", title="Matrice di Correlazione")
+    st.plotly_chart(fig_corr)
+    st.markdown("**Interpretazione**: Questa matrice di correlazione mostra come le diverse variabili sono correlate tra loro.")
 
-    st.subheader("Analisi delle Variabili Categoriche")
-    selected_col = st.selectbox("Seleziona colonna:", cat_cols, key="cat_analysis")
-    if selected_col:
-        value_counts = df[selected_col].value_counts().head(20)
-        st.write(f"**Top 20 valori per {selected_col}**")
-        st.dataframe(value_counts)
-        fig = px.bar(x=value_counts.index, y=value_counts.values, title=f"Distribuzione di {selected_col}")
-        st.plotly_chart(fig, use_container_width=True)
+    # Sezione Conclusioni
+    st.header("Conclusioni")
 
-# Funzione per mostrare l'analisi di correlazione
-def show_correlation_analysis(df):
-    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-    if len(numeric_cols) < 2:
-        st.warning("Servono almeno 2 colonne numeriche per l'analisi di correlazione")
-        return
+    st.markdown("""
+    ### Sintesi delle Scoperte
 
-    st.subheader("Analisi di Correlazione")
-    corr_matrix = df[numeric_cols].corr()
-    fig = px.imshow(corr_matrix, text_auto=True, aspect="auto", title="Matrice di Correlazione")
-    st.plotly_chart(fig, use_container_width=True)
+    1. **Soddisfazione degli Studenti**:
+       - I corsi di studi con la soddisfazione più alta sono quelli che probabilmente offrono un buon equilibrio tra carico di lavoro e supporto agli studenti.
+       - **Raccomandazione**: Identificare le pratiche dei corsi con alta soddisfazione e applicarle agli altri corsi.
 
-    if len(numeric_cols) >= 2:
-        st.write("**Scatter Plot**")
-        col1, col2 = st.columns(2)
-        with col1:
-            x_var = st.selectbox("Variabile X:", numeric_cols, key="scatter_x")
-        with col2:
-            y_var = st.selectbox("Variabile Y:", [c for c in numeric_cols if c != x_var], key="scatter_y")
-        if x_var and y_var:
-            fig = px.scatter(df, x=x_var, y=y_var, title=f"{x_var} vs {y_var}")
-            st.plotly_chart(fig, use_container_width=True)
+    2. **Tasso di Abbandono**:
+       - I corsi di studi con il tasso di abbandono più alto potrebbero avere problemi specifici che necessitano di essere indagati.
+       - **Raccomandazione**: Condurre indagini qualitative per comprendere le ragioni dell'abbandono e intervenire di conseguenza.
 
-# Funzione per analizzare i dati di churn
-def analyze_churn_data(df):
-    st.subheader("Analisi delle Predizioni di Abbandono")
-    prob_cols = [col for col in df.columns if 'prob' in col.lower() or 'pred' in col.lower()]
-    if prob_cols:
-        prob_col = st.selectbox("Seleziona colonna probabilità:", prob_cols)
-        if prob_col:
-            fig = px.histogram(df, x=prob_col, title=f"Distribuzione di {prob_col}")
-            st.plotly_chart(fig, use_container_width=True)
-            df['Risk_Category'] = pd.cut(df[prob_col], bins=[0, 0.3, 0.7, 1.0], labels=['Basso', 'Medio', 'Alto'])
-            risk_counts = df['Risk_Category'].value_counts()
-            st.write("**Distribuzione del Rischio**")
-            st.dataframe(risk_counts)
-            high_risk = df[df[prob_col] > 0.7].nlargest(10, prob_col)
-            if len(high_risk) > 0:
-                st.write("**Top 10 Studenti a Rischio**")
-                st.dataframe(high_risk)
+    3. **Partecipazione agli Eventi**:
+       - La partecipazione agli eventi è un indicatore di coinvolgimento degli studenti nella vita universitaria.
+       - **Raccomandazione**: Promuovere eventi e attività che possano aumentare la partecipazione e il senso di comunità tra gli studenti.
+    """)
 
-# Funzione per analizzare i dati di clustering
-def analyze_cluster_data(df):
-    st.subheader("Analisi di Clustering")
-    cluster_cols = [col for col in df.columns if 'cluster' in col.lower()]
-    if cluster_cols:
-        cluster_col = st.selectbox("Seleziona colonna cluster:", cluster_cols)
-        if cluster_col:
-            cluster_counts = df[cluster_col].value_counts()
-            st.write("**Distribuzione dei Cluster**")
-            st.dataframe(cluster_counts)
-            fig = px.bar(x=cluster_counts.index, y=cluster_counts.values, title="Distribuzione dei Cluster")
-            st.plotly_chart(fig, use_container_width=True)
-            numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-            if len(numeric_cols) >= 2:
-                st.write("**Confronto dei Cluster**")
-                x_var = st.selectbox("Variabile X:", numeric_cols, key="cluster_x")
-                y_var = st.selectbox("Variabile Y:", [c for c in numeric_cols if c != x_var], key="cluster_y")
-                if x_var and y_var:
-                    fig = px.scatter(df, x=x_var, y=y_var, color=cluster_col, title=f"{x_var} vs {y_var} per Cluster")
-                    st.plotly_chart(fig, use_container_width=True)
+    # Sezione Guide e Tutorial
+    st.header("Guide e Tutorial")
 
-# Funzione principale
-def main():
-    st.title("📊 Student Analytics Platform")
-    st.write("Piattaforma semplice per l'analisi dei dati studenteschi")
+    st.markdown("""
+    ### Come Utilizzare la Dashboard
 
-    with st.sidebar:
-        st.header("Controlli")
-        client = get_bigquery_client()
-        if client:
-            st.success("✅ Connesso a BigQuery")
-        else:
-            st.error("❌ Errore di connessione")
-            st.stop()
-        mode = st.radio("Modalità:", ["Esplora Tabelle", "Query Personalizzata"])
+    1. **Filtri**: Utilizza la sidebar per selezionare le variabili e i filtri desiderati. Puoi selezionare variabili numeriche e categoriche, e filtrare per corso di studi e anno di iscrizione.
 
-    if mode == "Esplora Tabelle":
-        show_table_explorer()
-    else:
-        show_custom_query()
+    2. **KPI**: Questa sezione mostra i principali indicatori chiave di prestazione. Ogni KPI è accompagnato da una descrizione che spiega cosa rappresenta e come interpretarlo.
 
-# Funzione per esplorare le tabelle
-def show_table_explorer():
-    st.header("Esplora Tabelle")
-    tables = get_tables()
-    if not tables:
-        st.warning("Nessuna tabella trovata")
-        return
-    selected_table = st.selectbox("Seleziona tabella:", tables)
-    if selected_table:
-        with st.spinner("Caricamento dati..."):
-            df = load_table_data(selected_table)
-        if df is not None:
-            tab1, tab2, tab3, tab4, tab5 = st.tabs(["Panoramica", "Numeriche", "Categoriche", "Correlazioni", "Specializzata"])
-            with tab1:
-                show_basic_stats(df)
-                show_column_info(df)
-                show_data_preview(df)
-            with tab2:
-                show_numeric_analysis(df)
-            with tab3:
-                show_categorical_analysis(df)
-            with tab4:
-                show_correlation_analysis(df)
-            with tab5:
-                if 'churn' in selected_table.lower():
-                    analyze_churn_data(df)
-                elif 'cluster' in selected_table.lower():
-                    analyze_cluster_data(df)
-                else:
-                    st.info("Nessuna analisi specializzata disponibile per questa tabella")
+    3. **Analisi Dettagliata**: Questa sezione mostra grafici dettagliati che ti permettono di esplorare i dati in modo più approfondito. Ogni grafico è accompagnato da un'interpretazione che ti aiuta a comprendere i dati visualizzati.
 
-# Funzione per eseguire query personalizzate
-def show_custom_query():
-    st.header("Query Personalizzata")
-    query = st.text_area("Inserisci query SQL:", height=200, placeholder=f"SELECT * FROM `{PROJECT_ID}.{DATASET_ID}.your_table` LIMIT 100")
-    if st.button("Esegui Query"):
-        if query.strip():
-            with st.spinner("Esecuzione query..."):
-                df = execute_custom_query(query)
-            if df is not None:
-                st.success(f"Query eseguita con successo! {len(df)} righe recuperate.")
-                st.subheader("Risultati")
-                show_basic_stats(df)
-                st.dataframe(df)
-                numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-                if numeric_cols:
-                    st.subheader("Analisi Rapida")
-                    st.dataframe(df[numeric_cols].describe())
-        else:
-            st.warning("Inserisci una query valida")
+    4. **Analisi delle Correlazioni**: Questa sezione mostra una matrice di correlazione che ti aiuta a comprendere come le diverse variabili sono correlate tra loro.
 
-if __name__ == "__main__":
-    main()
+    5. **Conclusioni**: Questa sezione fornisce una sintesi delle principali conclusioni tratte dai dati e raccomandazioni su come agire in base a queste scoperte.
+    """)
+else:
+    st.error("Impossibile caricare i dati da BigQuery.")
