@@ -1,4 +1,3 @@
-# Importazione delle librerie necessarie
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -29,61 +28,29 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-def check_credentials_file():
-    """
-    Verifica la presenza e la validità del file credentials.json.
-    Questo file è necessario per autenticarsi con Google Cloud.
-    """
-    try:
-        if not os.path.exists('credentials.json'):
-            st.error("❌ **File credentials.json non trovato!**")
-            st.info("📋 **Come risolvere:**")
-            st.write("1. Vai su Google Cloud Console")
-            st.write("2. IAM & Admin → Service Accounts")
-            st.write("3. Crea/scarica una nuova chiave JSON")
-            st.write("4. Rinomina il file in 'credentials.json'")
-            st.write("5. Metti il file nella stessa cartella di questo script")
-            return False
-
-        # Verifica che il file sia un JSON valido
-        with open('credentials.json', 'r') as f:
-            creds = json.load(f)
-            required_fields = ['type', 'project_id', 'private_key', 'client_email']
-            missing_fields = [field for field in required_fields if field not in creds]
-
-            if missing_fields:
-                st.error(f"❌ **Credenziali incomplete!** Mancano: {missing_fields}")
-                return False
-
-            if creds.get('project_id') != PROJECT_ID:
-                st.warning(f"⚠️ **Project ID diverso:** {creds.get('project_id')} vs {PROJECT_ID}")
-
-        st.success("✅ **File credentials.json trovato e valido**")
-        return True
-
-    except json.JSONDecodeError:
-        st.error("❌ **File credentials.json non è un JSON valido**")
-        return False
-    except Exception as e:
-        st.error(f"❌ **Errore nella verifica credenziali:** {str(e)}")
-        return False
-
-@st.cache_resource
 def init_bigquery_client():
     """
     Inizializza il client BigQuery con gestione degli errori migliorata.
-    Utilizza le credenziali dal file credentials.json per autenticarsi.
+    Utilizza le credenziali dai segreti di Streamlit per autenticarsi.
     """
     try:
-        # Verifica credenziali
-        if not check_credentials_file():
-            return None, "❌ Problema con le credenziali"
+        # Leggi le credenziali dai segreti di Streamlit
+        credentials_dict = {
+            "type": st.secrets["type"],
+            "project_id": st.secrets["project_id"],
+            "private_key_id": st.secrets["private_key_id"],
+            "private_key": st.secrets["private_key"],
+            "client_email": st.secrets["client_email"],
+            "client_id": st.secrets["client_id"],
+            "auth_uri": st.secrets["auth_uri"],
+            "token_uri": st.secrets["token_uri"],
+            "auth_provider_x509_cert_url": st.secrets["auth_provider_x509_cert_url"],
+            "client_x509_cert_url": st.secrets["client_x509_cert_url"],
+            "universe_domain": st.secrets["universe_domain"]
+        }
 
-        # Carica credenziali
-        credentials = service_account.Credentials.from_service_account_file(
-            'credentials.json',
-            scopes=["https://www.googleapis.com/auth/cloud-platform"]
-        )
+        # Crea le credenziali
+        credentials = service_account.Credentials.from_service_account_info(credentials_dict)
 
         # Crea client BigQuery
         client = bigquery.Client(credentials=credentials, project=PROJECT_ID)
