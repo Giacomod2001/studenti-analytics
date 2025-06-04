@@ -17,3 +17,4 @@ google-auth-httplib2>=0.1.0
 # Additional dependencies that might be needed
 pyarrow>=10.0.0  # For BigQuery data transfer optimization
 db-dtypes>=1.0.0  # For BigQuery specific data types
+statsmodels>=0.14.0  # For trendline analysis
