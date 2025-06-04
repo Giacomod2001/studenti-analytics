@@ -54,12 +54,6 @@ def check_credentials():
         creds, source = get_credentials()
         
         if not creds:
-            st.error("❌ **Credenziali non trovate!**")
-            st.info("📋 **Come configurare i Secrets su Streamlit Cloud:**")
-            st.write("1. Vai su share.streamlit.io")
-            st.write("2. Clicca sui tre puntini della tua app → Settings")
-            st.write("3. Vai alla sezione 'Secrets'")
-            st.write("4. Incolla la configurazione TOML")
             return False, "Credenziali mancanti"
         
         # Verifica campi obbligatori
@@ -67,17 +61,11 @@ def check_credentials():
         missing_fields = [field for field in required_fields if field not in creds]
         
         if missing_fields:
-            st.error(f"❌ **Credenziali incomplete!** Mancano: {missing_fields}")
             return False, f"Campi mancanti: {missing_fields}"
         
-        if creds.get('project_id') != PROJECT_ID:
-            st.warning(f"⚠️ **Project ID diverso:** {creds.get('project_id')} vs {PROJECT_ID}")
-        
-        st.success(f"✅ **Credenziali valide** (fonte: {source})")
         return True, f"OK - {source}"
         
     except Exception as e:
-        st.error(f"❌ **Errore nella verifica credenziali:** {str(e)}")
         return False, str(e)
 
 @st.cache_resource
@@ -509,42 +497,17 @@ def show_secrets_configuration():
     
     secrets_config = f"""[gcp_service_account]
 type = "service_account"
-project_id = "laboratorio-ai-460517"
-private_key_id = "9a00db80c80e0201715f307eb2948e313236c388"
+project_id = "{PROJECT_ID}"
+private_key_id = "your_private_key_id_here"
 private_key = '''-----BEGIN PRIVATE KEY-----
-MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCeuMAKO+T9BPc+
-lrK+wknGsPAh54Vot6e+kBeQobbbBLp+cn1KWNSBOgNjO9uDl110BIbO+KkIJjBE
-qbwagHgLK5yNXd9DMMQTaKPcNbTPaABOQGHOofz2Na6t660wYXdhzivTXtTqC/hm
-mPCJ4L45JaK62XKKz4wFf27ys5wSMe+ril88l8jQe6DusiqrbJcmKEPn6BWAg3R7
-s1387CGJFL0GVrx+9fCp3jTjCOKbBGngYFjJjRQVPTzHkAVugxb6ztWsv4dlRhhR
-cEuuYoBC9QyNGOjXodYmNQPtrnfUFRsrcPnyLiUVvsbRru3HE6KzQ05NY3mZ/V5D
-PXwzrI2nAgMBAAECggEAD3PkOnrXUezkV2Mblufaf+4lCt/8BJRwz+Q+bxXXdB5T
-O9FQsmbQlZ48yzH+LqMTdaKlL0xVRJZXN7AgwKHGTiwaS0ca3/NE+7DB10QhTNoO
-wY+SFih+NMhIL+WUkHPEyDBm4ubGKt0se2yjaoEHdA/ednuKI8qOEtDzz8w9wyWT
-L2EpeohzPxaFhfYzjmMVTnOgUJ1x7NsEkQBaSTpTmiNLVTJW1B/0hZqC/oxuaEHm
-nxZcr81IYkjYX5QVlKG7v3mV0aj+m8lqEddBroIhYPXmK7jRTROtm/7I1AMhUJMZ
-PAJ6lZYTuF/sHyPfVBMnJ6aQjMWtzkVqxQUdKdQxuQKBgQDQA5gBC7FM9Qfk3ZBD
-4isvjmkKGpc1jRNUmW+2cCoK8R13Du8lvu7YgVGON2pGna7C/0CEDjN0MT9zIx55
-GxDI4TkCiJafMR7A+3ytOfuAJB0Ky4FvctA8XJWd0aisRxNDge9/fIqzES8ZbM9m
-cl8cO5Lo5d31yOCxSfINeO/3SQKBgQDDVinnHtP/DjIroKQEabLh9tbjINcKv9Kw
-H1+rGPDWZkIz6WpGquRXta2WZf2KVAbBnxBQD6DLQpIDUjb2meN5hh9kZN1JMB7X
-S6CLgaFSm7FsjolezAi4one0efNTZYKke1tMW0BpUC+a0J8nXE8gi3sGhZWAIKpd
-onRo+WStbwKBgHQhTX9n87gvJBUVzTDY15tZOjM13S08cYpNjxyfShmJuxV49PJx
-wg6FQ+7N6Ts7VRHwRyhydS9tPyscdCrQfXJoqtdLQivl1HGQ9W4QbOSBROV97+k0
-hCTu22icYDquA4cwx3C5KwYFlfHv2WoseATfDYmQq3ZIi4ju63+yAOZhAoGAT5Jl
-BXJod6kHxP/ucKHCLgyIowN4tjdIE1jkduV1DlGfvFfkZB8vX49xxCeN7fCmw+8R
-DRwgq0xWAKZYH4K2yIVbemEgR7Ujix6SquHGnskvsIIr8YL6NoRwcQOQnLNoUaqy
-mVs+1OfGTLGZc8ZFsYNAPXrjWMt1uyj3dN/LJF8CgYBHbUL51jJu07fp4lvVSdiB
-WxD0QVU3/IsoY78HFMyvqKtiRJLd45KQtciztJO0YaUtjj23Fvm0BpcHivtqwlWx
-6nMyIdAwjgIwPUavtiAZt95uJNJyWyaBxfFN1eKdaQ4Tl4wDCaddgeV618468Wb4
-t9w1nd62J1KdTbs0HAOVoQ==
+your_private_key_here
 -----END PRIVATE KEY-----'''
-client_email = "streamlit-bq-reader@laboratorio-ai-460517.iam.gserviceaccount.com"
-client_id = "102223446160508469105"
+client_email = "your_service_account_email@{PROJECT_ID}.iam.gserviceaccount.com"
+client_id = "your_client_id_here"
 auth_uri = "https://accounts.google.com/o/oauth2/auth"
 token_uri = "https://oauth2.googleapis.com/token"
 auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs"
-client_x509_cert_url = "https://www.googleapis.com/robot/v1/metadata/x509/streamlit-bq-reader%40laboratorio-ai-460517.iam.gserviceaccount.com"
+client_x509_cert_url = "https://www.googleapis.com/robot/v1/metadata/x509/your_service_account_email%40{PROJECT_ID}.iam.gserviceaccount.com"
 universe_domain = "googleapis.com"
 """
     
@@ -556,20 +519,125 @@ universe_domain = "googleapis.com"
 
 def main():
     """Funzione principale dell'app Streamlit"""
-    st.title("🎓 Student Analytics Dashboard")
-    st.markdown("---")
-    
-    # Sidebar
-    st.sidebar.header("⚙️ Configurazione")
-    
-    # Inizializzazione BigQuery
-    with st.spinner("🔄 Connessione a BigQuery..."):
-        client, status = init_bigquery_client()
-    
-    # Mostra status connessione
-    if "✅" in status:
-        st.sidebar.success(status)
-    else:
-        st.sidebar.error(status)
+    try:
+        st.title("🎓 Student Analytics Dashboard")
+        st.markdown("---")
         
-        # Mostra guida configurazione se le credenziali manc
+        # Sidebar
+        st.sidebar.header("⚙️ Configurazione")
+        
+        # Inizializzazione BigQuery
+        with st.spinner("🔄 Connessione a BigQuery..."):
+            client, status = init_bigquery_client()
+        
+        # Mostra status connessione
+        if "✅" in status:
+            st.sidebar.success(status)
+        else:
+            st.sidebar.error(status)
+            
+            # Mostra guida configurazione se le credenziali mancano
+            if "Credenziali" in status or "mancanti" in status:
+                show_secrets_configuration()
+                return
+        
+        # Se non riusciamo a connetterci, mostra modalità offline
+        if not client:
+            st.warning("⚠️ **Modalità Offline** - Connessione BigQuery non disponibile")
+            st.info("🔧 Controlla la configurazione delle credenziali nella sidebar")
+            
+            # Mostra dati di esempio
+            st.header("📊 Dati di Esempio")
+            sample_data = pd.DataFrame({
+                'id': range(1, 101),
+                'nome': [f'Studente_{i}' for i in range(1, 101)],
+                'voto_medio': np.random.normal(7.5, 1.5, 100),
+                'presenze': np.random.randint(80, 100, 100),
+                'corso': np.random.choice(['Informatica', 'Matematica', 'Fisica'], 100)
+            })
+            
+            st.dataframe(sample_data.head(20), use_container_width=True)
+            return
+        
+        # Menu principale
+        menu_options = ["📊 Panoramica Dataset", "📈 Analisi Dati", "📋 Visualizza Dati"]
+        selected_menu = st.sidebar.selectbox("🔧 Seleziona Funzione:", menu_options)
+        
+        # Carica tabelle disponibili
+        with st.spinner("📂 Caricamento tabelle..."):
+            tables, tables_status = get_all_tables()
+        
+        if "❌" in tables_status:
+            st.error(f"Errore nel caricamento tabelle: {tables_status}")
+            return
+        
+        st.sidebar.info(tables_status)
+        
+        # Renderizza contenuto basato su selezione menu
+        if selected_menu == "📊 Panoramica Dataset":
+            render_tables_overview(tables)
+        
+        elif selected_menu == "📈 Analisi Dati":
+            if not tables:
+                st.warning("⚠️ Nessuna tabella disponibile per l'analisi")
+                return
+            
+            # Selezione tabella
+            table_names = [t['name'] for t in tables]
+            selected_table = st.sidebar.selectbox("📋 Seleziona Tabella:", table_names)
+            
+            if selected_table:
+                # Trova info tabella
+                table_info = next((t for t in tables if t['name'] == selected_table), None)
+                
+                if table_info:
+                    # Carica dati
+                    with st.spinner(f"⏳ Caricamento dati da {selected_table}..."):
+                        df, load_status = load_table_data(selected_table)
+                    
+                    st.sidebar.info(load_status)
+                    
+                    # Analisi dati
+                    render_data_analysis(df, table_info)
+        
+        elif selected_menu == "📋 Visualizza Dati":
+            if not tables:
+                st.warning("⚠️ Nessuna tabella disponibile")
+                return
+            
+            # Selezione tabella
+            table_names = [t['name'] for t in tables]
+            selected_table = st.sidebar.selectbox("📋 Seleziona Tabella:", table_names)
+            
+            if selected_table:
+                # Limiti di caricamento
+                limit = st.sidebar.number_input("📏 Limite righe:", min_value=100, max_value=10000, value=1000, step=100)
+                
+                # Carica dati
+                with st.spinner(f"⏳ Caricamento {limit} righe da {selected_table}..."):
+                    df, load_status = load_table_data(selected_table, limit)
+                
+                st.sidebar.info(load_status)
+                
+                # Visualizza dati
+                render_raw_data_viewer(df)
+        
+        # Footer
+        st.markdown("---")
+        st.markdown("🎓 **Student Analytics Dashboard** - Powered by Streamlit & BigQuery")
+        
+    except Exception as e:
+        st.error(f"❌ **Errore critico nell'applicazione:**")
+        st.error(str(e))
+        
+        # Mostra traceback in expander per debug
+        with st.expander("🔍 Dettagli errore (per debug)"):
+            st.code(traceback.format_exc())
+        
+        st.info("💡 **Suggerimenti:**")
+        st.write("- Verifica le credenziali BigQuery")
+        st.write("- Controlla la connessione internet")
+        st.write("- Riavvia l'applicazione")
+
+if __name__ == "__main__":
+    main()
