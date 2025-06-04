@@ -342,7 +342,12 @@ def main():
     else:
         st.sidebar.success(tables_status)
 
-    # ─── 6.3) SELEZIONE DELLA TABELLA ─────────────────────────────────────────────
+    # ─── 6.3) SPIEGAZIONE DI OGNI TABELLA NELLA SIDEBAR ────────────────────────────
+    with st.sidebar.expander("📖 Spiegazione Tabelle", expanded=False):
+        for t in tables_info:
+            st.markdown(f"**{t['name']}**: {t['description']}")
+
+    # ─── 6.4) SELEZIONE DELLA TABELLA ─────────────────────────────────────────────
     st.sidebar.markdown("---")
     st.sidebar.subheader("📋 Seleziona Tabella")
     table_names = [t["name"] for t in tables_info]
@@ -350,7 +355,7 @@ def main():
 
     current_info = next((t for t in tables_info if t["name"] == sel_table), None)
 
-    # ─── 6.4) CARICAMENTO DEI DATI (TUTTI) ────────────────────────────────────────
+    # ─── 6.5) CARICAMENTO DEI DATI (TUTTI) ────────────────────────────────────────
     with st.spinner(f"⏳ Caricamento dati da {sel_table}..."):
         df, load_msg = load_full_table(sel_table)
 
@@ -361,16 +366,15 @@ def main():
     else:
         st.sidebar.success(load_msg)
 
-    # ─── 6.5) PULSANTE DI REFRESH DELLA CACHE ─────────────────────────────────────
+    # ─── 6.6) PULSANTE DI REFRESH DELLA CACHE ─────────────────────────────────────
     st.sidebar.markdown("---")
     if st.sidebar.button("🔄 Ricarica Dati (cancella cache)"):
         st.cache_data.clear()
         st.experimental_rerun()
 
-    # ─── 6.6) RENDERING DELL’ANALISI PRINCIPALE ──────────────────────────────────
+    # ─── 6.7) RENDERING DELL’ANALISI PRINCIPALE ──────────────────────────────────
     render_table_inspection(df, current_info)
 
 
 if __name__ == "__main__":
     main()
-
