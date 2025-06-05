@@ -24,14 +24,14 @@ DATASET_ID = "dataset"
 
 # ─── 2) MAPPA DELLE DESCRIZIONI E ORIGINI DEI DATI ───────────────────────────────
 
-# Descrizioni “uman‐readable” di ogni tabella presente in BigQuery
+# Descrizioni "uman‐readable" di ogni tabella presente in BigQuery
 TABLE_DESCRIPTIONS = {
     "studenti": "Dati anagrafici e performance degli studenti",
     "studenti_churn_pred": "Previsioni di abbandono scolastico con probabilità",
     "studenti_cluster": "Segmentazione degli studenti tramite clustering",
     "studenti_soddisfazione_btr": "Analisi della soddisfazione degli studenti",
     "feature_importance_studenti": "Importanza delle variabili nel modello predittivo",
-    "report_finale_soddisfazione_studenti": "Report completo dell’analisi di soddisfazione",
+    "report_finale_soddisfazione_studenti": "Report completo dell'analisi di soddisfazione",
     "student_churn_rf": "Dettagli del modello Random Forest per la previsione di abbandono",
     "student_kmeans": "Dettagli del modello K-means per clustering comportamentale"
 }
@@ -41,7 +41,7 @@ TABLE_ORIGINS = {
     "studenti": """**Origine:**
 
 La tabella `studenti` raccoglie le informazioni anagrafiche e le metriche di performance di ogni studente.
-I dati di partenza provengono dal gestionale dell’università (registro studenti, voti, esami sostenuti, ecc.).
+I dati di partenza provengono dal gestionale dell'università (registro studenti, voti, esami sostenuti, ecc.).
 Prima di caricarli in BigQuery, è stato eseguito un processo di pulizia e normalizzazione:
 - Rimozione di record duplicati
 - Uniformazione dei formati di data e di stringa
@@ -60,7 +60,7 @@ Questa tabella contiene le previsioni di abbandono scolastico (churn) generate d
 """,
     "student_churn_rf": """**Origine:**
 
-Questa tabella contiene i dettagli e le metriche del modello **Random Forest** usato per predire l’abbandono scolastico.
+Questa tabella contiene i dettagli e le metriche del modello **Random Forest** usato per predire l'abbandono scolastico.
 Ogni riga riporta:
 - Una metrica di performance (es. accuracy, precision, recall) calcolata sul test set.
 - I parametri ottimali utilizzati (numero di alberi, profondità massima, ecc.).
@@ -68,32 +68,32 @@ Viene generata durante la fase di validazione, dopo aver eseguito hyperparameter
 """,
     "feature_importance_studenti": """**Origine:**
 
-Questa tabella mostra l’importanza delle variabili (feature importance) estratte dal modello di Random Forest `student_churn_rf`.
+Questa tabella mostra l'importanza delle variabili (feature importance) estratte dal modello di Random Forest `student_churn_rf`.
 Per ogni caratteristica (`caratteristica`) sono presenti:
 - `peso_importanza`: numero di volte in cui la feature è stata selezionata per una divisione nei vari alberi del modello.
-- `guadagno_informazione`: somma dell’informazione guadagnata, che indica quanto la feature ha contribuito a ridurre l’impurità.
+- `guadagno_informazione`: somma dell'informazione guadagnata, che indica quanto la feature ha contribuito a ridurre l'impurità.
 - `copertura`: numero totale di esempi nel dataset che hanno attraversato un nodo che usa quella feature.
 - `percentuale_importanza`: peso normalizzato su scala [0,100].
-- `categoria_importanza`: etichetta qualitativa (per esempio: “Molto Importante”, “Moderatamente Importante”, “Poco Importante”).
+- `categoria_importanza`: etichetta qualitativa (per esempio: "Molto Importante", "Moderatamente Importante", "Poco Importante").
 Questa tabella viene generata prendendo i valori di `feature_importances_` di scikit-learn dal modello e salvandoli su BigQuery.
 """,
     "studenti_cluster": """**Origine:**
 
-La tabella `studenti_cluster` assegna ogni studente a un cluster, ottenuto tramite l’algoritmo **K-means**.
+La tabella `studenti_cluster` assegna ogni studente a un cluster, ottenuto tramite l'algoritmo **K-means**.
 **Passaggi principali:**
 1. Selezione di feature numeriche significative (es. ore di studio settimanali, media voti, numero di assenze).
 2. Standardizzazione delle variabili (scaling) in modo che abbiano media = 0 e varianza = 1.
 3. Addestramento di K-means con K = 4 (numero di cluster scelto via elbow method).
-4. Calcolo del centroide per ogni cluster e assegnazione dell’etichetta `cluster_id` a ciascuno studente.
+4. Calcolo del centroide per ogni cluster e assegnazione dell'etichetta `cluster_id` a ciascuno studente.
 5. Salvataggio in questa tabella di `cluster_id`, delle coordinate dei centroidi e della distanza di ciascuno studente dal proprio centroide.
 """,
     "student_kmeans": """**Origine:**
 
-Questa tabella contiene i dettagli dell’algoritmo **K-means (K = 4)** utilizzato per il clustering degli studenti.
+Questa tabella contiene i dettagli dell'algoritmo **K-means (K = 4)** utilizzato per il clustering degli studenti.
 Include:
 - Le coordinate dei centroidi di ciascun cluster.
-- L’inertia (somma delle distanze al quadrato dei punti dal rispettivo centroide) per ogni iterazione (utile per verificare la convergenza).
-Viene creata durante l’addestramento di K-means per analizzare la qualità della suddivisione.
+- L'inertia (somma delle distanze al quadrato dei punti dal rispettivo centroide) per ogni iterazione (utile per verificare la convergenza).
+Viene creata durante l'addestramento di K-means per analizzare la qualità della suddivisione.
 """,
     "studenti_soddisfazione_btr": """**Origine:**
 
@@ -108,11 +108,11 @@ Questa tabella registra i risultati di un modello di regressione **Boosted Tree*
 """,
     "report_finale_soddisfazione_studenti": """**Origine:**
 
-Questo report riassume l’analisi di soddisfazione degli studenti, basata sui risultati di `studenti_soddisfazione_btr`.
+Questo report riassume l'analisi di soddisfazione degli studenti, basata sui risultati di `studenti_soddisfazione_btr`.
 Include:
 - Grafici di distribuzione dei punteggi di soddisfazione.
 - Confronto tra corsi di laurea e cluster di studenti.
-- Suggerimenti operativi per migliorare l’esperienza studentesca.
+- Suggerimenti operativi per migliorare l'esperienza studentesca.
 Viene generato automaticamente tramite uno script Python che:
 1. Crea diverse viste (view) in BigQuery.
 2. Aggrega i dati in tabelle di sintesi.
@@ -126,7 +126,7 @@ def init_bigquery_client():
     """
     Inizializza il client BigQuery utilizzando le credenziali
     presenti in st.secrets. Ritorna (client, messaggio_status).
-    In caso di errore, client=None e status contiene l’errore.
+    In caso di errore, client=None e status contiene l'errore.
     """
     try:
         credentials_dict = {
@@ -175,8 +175,8 @@ def get_all_tables():
     Recupera tutte le tabelle presenti nel dataset specificato.
     Ritorna (lista_tables, messaggio_status).
     Ogni elemento di lista_tables è un dict con:
-        - id: l’ID (nome) della tabella
-        - name: stesso dell’ID
+        - id: l'ID (nome) della tabella
+        - name: stesso dell'ID
         - description: descrizione testuale
         - rows: numero di righe
         - size_mb: dimensione in MB
@@ -217,8 +217,9 @@ def get_all_tables():
 @st.cache_data(ttl=300)
 def load_full_table(table_id: str) -> (pd.DataFrame, str):
     """
-    Carica l’intera tabella BigQuery (senza limiti) in un DataFrame pandas.
-    Ritorna (df, status_message). Se df è None, status_message contiene l’errore.
+    Carica l'intera tabella BigQuery (senza limiti) in un DataFrame pandas.
+    Gestisce il problema db-dtypes con fallback a conversione manuale.
+    Ritorna (df, status_message). Se df è None, status_message contiene l'errore.
     """
     client, status = init_bigquery_client()
     if not client:
@@ -226,7 +227,51 @@ def load_full_table(table_id: str) -> (pd.DataFrame, str):
 
     try:
         query = f"SELECT * FROM `{PROJECT_ID}.{DATASET_ID}.{table_id}`"
-        df = client.query(query).to_dataframe()
+        
+        # Primo tentativo: conversione diretta a DataFrame
+        try:
+            df = client.query(query).to_dataframe()
+        except Exception as e:
+            if "db-dtypes" in str(e).lower():
+                # Fallback: carica i dati come righe e converti manualmente
+                logger.warning(f"db-dtypes non disponibile, uso fallback per {table_id}")
+                query_job = client.query(query)
+                results = query_job.result()
+                
+                # Converti i risultati in lista di dizionari
+                rows = []
+                for row in results:
+                    row_dict = {}
+                    for key, value in row.items():
+                        # Gestisci tipi speciali di BigQuery
+                        if hasattr(value, 'isoformat'):  # DATE, DATETIME, TIMESTAMP
+                            row_dict[key] = value.isoformat()
+                        elif isinstance(value, bytes):  # BYTES
+                            row_dict[key] = value.decode('utf-8', errors='ignore')
+                        else:
+                            row_dict[key] = value
+                    rows.append(row_dict)
+                
+                # Crea DataFrame dai dizionari
+                df = pd.DataFrame(rows)
+                
+                # Converti colonne numeriche dove possibile
+                for col in df.columns:
+                    if df[col].dtype == 'object':
+                        # Prova a convertire in numerico
+                        try:
+                            df[col] = pd.to_numeric(df[col], errors='ignore')
+                        except:
+                            pass
+                        
+                        # Prova a convertire in datetime
+                        if df[col].dtype == 'object':
+                            try:
+                                df[col] = pd.to_datetime(df[col], errors='ignore')
+                            except:
+                                pass
+            else:
+                raise e
 
         if df.empty:
             return df, f"⚠️ Tabella {table_id} è vuota"
@@ -283,15 +328,15 @@ def render_overview(tables_info: list):
 def render_table_inspection(df: pd.DataFrame, table_info: dict):
     """
     Mostra:
-    1. Spiegazione breve dell’origine dei dati e dell’algoritmo utilizzato
+    1. Spiegazione breve dell'origine dei dati e dell'algoritmo utilizzato
     2. Intestazione con nome tabella e descrizione
     3. Metriche base: numero righe, colonne, percentuale missing, memoria
     4. Anteprima (prime 20 righe)
     5. Selezione colonne da includere/visualizzare
     6. Grafici base: distribuzioni (istogrammi) e correlazioni (heatmap)
-    7. Sezione “Dati Grezzi e Download” con filtro testuale
+    7. Sezione "Dati Grezzi e Download" con filtro testuale
     """
-    # ─── 6.1) “Origine dei Dati e Algoritmi Utilizzati” ────────────────────────────
+    # ─── 6.1) "Origine dei Dati e Algoritmi Utilizzati" ────────────────────────────
     st.subheader("📖 Origine dei Dati e Algoritmi Utilizzati")
     origin_text = TABLE_ORIGINS.get(
         table_info["id"],
@@ -302,7 +347,7 @@ def render_table_inspection(df: pd.DataFrame, table_info: dict):
   o modelli di Boosted Tree (per soddisfazione).
 - Salvataggio: i risultati vengono memorizzati in BigQuery per permettere visualizzazione e download.
 
-Consulta la sezione “Spiegazione Tabelle” nella sidebar per dettagli specifici su ogni tabella."""
+Consulta la sezione "Spiegazione Tabelle" nella sidebar per dettagli specifici su ogni tabella."""
     )
     st.markdown(origin_text)
     st.markdown("---")
@@ -408,7 +453,7 @@ def main():
     st.sidebar.title("🎓 Student Analytics Dashboard")
     st.sidebar.markdown("""
     Benvenuto! Questa applicazione ti permette di esplorare **tutti i dati** delle tabelle
-    presenti nel dataset BigQuery, con un’interfaccia semplice e intuitiva.
+    presenti nel dataset BigQuery, con un'interfaccia semplice e intuitiva.
     """)
 
     # ─── 7.1) CONNESSIONE A BIGQUERY ───────────────────────────────────────────────
@@ -432,7 +477,7 @@ def main():
     else:
         st.sidebar.success(tables_status)
 
-    # ─── 7.3) “Spiegazione Tabelle” NELLA SIDEBAR ─────────────────────────────────
+    # ─── 7.3) "Spiegazione Tabelle" NELLA SIDEBAR ─────────────────────────────────
     with st.sidebar.expander("📖 Spiegazione Tabelle", expanded=False):
         for t in tables_info:
             descr = TABLE_DESCRIPTIONS.get(t["id"], f"Tabella dati: {t['id']}")
@@ -463,7 +508,7 @@ def main():
         st.cache_data.clear()
         st.experimental_rerun()
 
-    # ─── 7.7) RENDERING DELL’ANALISI PRINCIPALE ──────────────────────────────────
+    # ─── 7.7) RENDERING DELL'ANALISI PRINCIPALE ──────────────────────────────────
     render_table_inspection(df, current_info)
 
 
