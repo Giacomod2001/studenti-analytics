@@ -9,6 +9,6 @@ plotly>=5.15.0
 # ─── GOOGLE CLOUD ──────────────────────────────────────────────────────────────
 google-cloud-bigquery>=3.11.0
 google-auth>=2.17.0
-
+pyarrow 
 # ─── OPTIONAL: PERFORMANCE BOOST ──────────────────────────────────────────────
 # Uncomment if you want
