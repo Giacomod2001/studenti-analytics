@@ -123,7 +123,6 @@ Viene generato automaticamente tramite uno script Python che:
 
 # ─── 3) FUNZIONE DI INIZIALIZZAZIONE DEL CLIENT BIGQUERY (NON CACHED) ─────────────
 
-giacomo, [29/11/2025 21:59]
 def init_bigquery_client():
     """
     Inizializza il client BigQuery utilizzando le credenziali
@@ -221,7 +220,6 @@ def load_table_data(table_id: str):
     if not client:
         return None, status
 
-giacomo, [29/11/2025 21:59]
 try:
         query = f"SELECT * FROM {PROJECT_ID}.{DATASET_ID}.{table_id}"
         
@@ -323,7 +321,6 @@ def render_overview(tables_info: list):
         st.warning("⚠️ Nessuna tabella trovata nel dataset")
         return
 
-giacomo, [29/11/2025 21:59]
 # Calcolo metriche
     total_tabelle = len(tables_info)
     total_righe = sum(t["rows"] for t in tables_info)
@@ -421,7 +418,6 @@ Consulta la sezione "Spiegazione Tabelle" nella sidebar per dettagli specifici s
     st.subheader("📊 Grafici Base")
     numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
 
-giacomo, [29/11/2025 21:59]
 if not numeric_cols:
         st.info("ℹ️ Nessuna colonna numerica disponibile per i grafici.")
     else:
@@ -515,7 +511,6 @@ def main():
             descr = TABLE_DESCRIPTIONS.get(t["id"], f"Tabella dati: {t['id']}")
             st.markdown(f"{t['name']}: {descr}")
 
-giacomo, [29/11/2025 21:59]
 # ─── 7.4) SELEZIONE DELLA TABELLA ─────────────────────────────────────────────
     st.sidebar.markdown("---")
     st.sidebar.subheader("📋 Seleziona Tabella")
