@@ -305,12 +305,45 @@ def inject_custom_css():
 
 # ─── 6) FUNZIONI DI RENDERING / VISUALIZZAZIONE DEI DATI ─────────────────────────
 
+def apply_chart_theme(fig):
+    """
+    Applica un tema personalizzato 'Premium' ai grafici Plotly.
+    """
+    fig.update_layout(
+        template="plotly_white",
+        font=dict(family="Inter, sans-serif", size=12, color="#333333"),
+        title_font=dict(family="Inter, sans-serif", size=18, color="#111111", weight=700),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        margin=dict(l=20, r=20, t=50, b=20),
+        hoverlabel=dict(
+            bgcolor="white",
+            font_size=12,
+            font_family="Inter, sans-serif"
+        ),
+        colorway=px.colors.qualitative.Bold  # Palette colori professionale
+    )
+    fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='#f0f2f6')
+    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='#f0f2f6')
+    return fig
+
 def render_home_dashboard(tables_info):
     """
-    Dashboard principale con KPI aggregati.
+    Dashboard principale con KPI aggregati e sezione About.
     """
     st.title("🎓 Student Analytics Dashboard")
-    st.markdown("Benvenuto nella piattaforma di analisi dati studenti. Seleziona una sezione dalla sidebar per esplorare i dettagli.")
+    
+    # Sezione About
+    st.markdown("""
+    <div style="background-color: #eef2ff; padding: 20px; border-radius: 10px; border-left: 5px solid #4f46e5; margin-bottom: 25px;">
+        <h4 style="color: #4f46e5; margin-top: 0;">ℹ️ About this Dashboard</h4>
+        <p style="margin-bottom: 0; color: #374151;">
+            Streamlit dashboard for student analytics powered by <b>Google BigQuery</b>. 
+            Features ML-driven dropout prediction (<i>Random Forest</i>), student clustering (<i>K-means</i>), 
+            and satisfaction analysis (<i>Boosted Trees</i>) with interactive visualizations and CSV export capabilities.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
     
     # KPI Cards Row
     col1, col2, col3, col4 = st.columns(4)
@@ -318,9 +351,7 @@ def render_home_dashboard(tables_info):
     total_rows = sum(t["rows"] for t in tables_info)
     total_size = sum(t["size_mb"] for t in tables_info)
     last_update = max([t["created"] for t in tables_info]) if tables_info else "N/A"
-    if isinstance(last_update, str) and last_update != "N/A":
-        pass # è già stringa
-    elif last_update != "N/A":
+    if hasattr(last_update, 'strftime'):
         last_update = last_update.strftime("%d/%m/%Y")
 
     col1.metric("Dataset Totali", len(tables_info))
@@ -330,17 +361,40 @@ def render_home_dashboard(tables_info):
     
     st.markdown("---")
     
-    st.subheader("📂 Catalogo Dati Disponibili")
+    # Grafico riassuntivo dimensioni tabelle
+    st.subheader("� Panoramica Dataset")
+    if tables_info:
+        df_summary = pd.DataFrame(tables_info)
+        fig = px.bar(
+            df_summary, 
+            x='name', 
+            y='rows', 
+            title="Record per Tabella",
+            labels={'name': 'Tabella', 'rows': 'Numero Record'},
+            color='rows',
+            color_continuous_scale='Viridis'
+        )
+        fig = apply_chart_theme(fig)
+        st.plotly_chart(fig, use_container_width=True)
+    
+    st.markdown("---")
+    st.subheader("📂 Catalogo Dati")
     
     # Grid layout per le card delle tabelle
     cols = st.columns(3)
     for idx, t in enumerate(tables_info):
         with cols[idx % 3]:
             with st.container():
-                st.markdown(f"#### 📄 {t['name']}")
-                st.caption(t['description'])
-                st.markdown(f"**Righe:** {t['rows']:,} | **Size:** {t['size_mb']} MB")
-                st.progress(min(1.0, t['rows'] / (total_rows if total_rows > 0 else 1)))
+                st.markdown(f"""
+                <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px; height: 100%; background-color: white;">
+                    <h4 style="margin-top: 0; color: #111827;">📄 {t['name']}</h4>
+                    <p style="font-size: 0.9em; color: #6b7280; height: 40px; overflow: hidden; text-overflow: ellipsis;">{t['description']}</p>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+                        <span style="background-color: #f3f4f6; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; color: #374151;">{t['rows']:,} righe</span>
+                        <span style="font-size: 0.8em; color: #9ca3af;">{t['size_mb']} MB</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
 
 
 def render_table_inspection(df: pd.DataFrame, table_info: dict):
@@ -348,10 +402,20 @@ def render_table_inspection(df: pd.DataFrame, table_info: dict):
     Visualizzazione dettagliata di una singola tabella.
     """
     # Header con metadati
-    st.title(f"📄 {table_info['name']}")
-    st.markdown(f"*{table_info['description']}*")
+    col_head_1, col_head_2 = st.columns([3, 1])
+    with col_head_1:
+        st.title(f"📄 {table_info['name']}")
+        st.markdown(f"*{table_info['description']}*")
+    with col_head_2:
+        st.download_button(
+            label="📥 Export CSV",
+            data=df.to_csv(index=False).encode("utf-8"),
+            file_name=f"{table_info['name']}.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
     
-    # Metriche rapide della tabella
+    # Metriche rapide
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Righe", f"{len(df):,}")
     m2.metric("Colonne", len(df.columns))
@@ -362,16 +426,17 @@ def render_table_inspection(df: pd.DataFrame, table_info: dict):
     
     st.markdown("---")
 
-    # Tabs per organizzare la vista
+    # Tabs
     tab_data, tab_stats, tab_info = st.tabs(["🔍 Esplora Dati", "📊 Statistiche & Grafici", "ℹ️ Info & Origine"])
     
     with tab_data:
-        st.subheader("Anteprima Dati")
-        
         # Filtri rapidi
         with st.expander("🔎 Filtri Avanzati", expanded=False):
-            search = st.text_input("Cerca testo in tutte le colonne", placeholder="Digita per filtrare...")
-            cols = st.multiselect("Seleziona colonne", df.columns.tolist(), default=df.columns.tolist()[:8])
+            col_f1, col_f2 = st.columns([1, 2])
+            with col_f1:
+                search = st.text_input("Cerca testo", placeholder="Digita per filtrare...")
+            with col_f2:
+                cols = st.multiselect("Colonne visibili", df.columns.tolist(), default=df.columns.tolist()[:8])
         
         df_view = df.copy()
         if search:
@@ -379,45 +444,51 @@ def render_table_inspection(df: pd.DataFrame, table_info: dict):
             df_view = df_view[mask]
         
         if cols:
-            st.dataframe(df_view[cols].head(100), use_container_width=True, height=400)
+            st.dataframe(df_view[cols].head(200), use_container_width=True, height=500)
+            st.caption(f"Mostrando {min(200, len(df_view))} di {len(df_view)} righe filtrate.")
         else:
             st.warning("Seleziona almeno una colonna.")
-            
-        st.caption(f"Mostrando {min(100, len(df_view))} di {len(df_view)} righe filtratte.")
 
     with tab_stats:
         numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-        cat_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
         
-        col_viz_1, col_viz_2 = st.columns([1, 2])
+        col_viz_1, col_viz_2 = st.columns([1, 3])
         
         with col_viz_1:
-            st.markdown("### Configurazione Grafico")
-            chart_type = st.selectbox("Tipo Grafico", ["Istogramma", "Box Plot", "Scatter", "Bar Chart"])
+            st.markdown("#### ⚙️ Configurazione")
+            chart_type = st.selectbox("Tipo Grafico", ["Istogramma", "Box Plot", "Scatter", "Bar Chart", "Heatmap"], index=0)
             
             x_axis = st.selectbox("Asse X", df.columns)
-            y_axis = st.selectbox("Asse Y (Opzionale)", [None] + numeric_cols)
-            color_dim = st.selectbox("Colore (Opzionale)", [None] + df.columns.tolist())
+            y_axis = st.selectbox("Asse Y", [None] + numeric_cols) if chart_type != "Heatmap" else None
+            color_dim = st.selectbox("Colore", [None] + df.columns.tolist()) if chart_type != "Heatmap" else None
             
         with col_viz_2:
             try:
+                fig = None
                 if chart_type == "Istogramma":
-                    fig = px.histogram(df, x=x_axis, y=y_axis, color=color_dim, template="plotly_white")
+                    fig = px.histogram(df, x=x_axis, y=y_axis, color=color_dim, title=f"Distribuzione di {x_axis}")
                 elif chart_type == "Box Plot":
-                    fig = px.box(df, x=x_axis, y=y_axis, color=color_dim, template="plotly_white")
+                    fig = px.box(df, x=x_axis, y=y_axis, color=color_dim, title=f"Box Plot {x_axis}")
                 elif chart_type == "Scatter":
-                    fig = px.scatter(df, x=x_axis, y=y_axis, color=color_dim, template="plotly_white")
+                    fig = px.scatter(df, x=x_axis, y=y_axis, color=color_dim, title=f"Scatter {x_axis} vs {y_axis}")
                 elif chart_type == "Bar Chart":
-                    # Aggregazione automatica per bar chart se troppi dati
                     if len(df) > 1000 and y_axis:
                         df_agg = df.groupby(x_axis)[y_axis].mean().reset_index()
-                        fig = px.bar(df_agg, x=x_axis, y=y_axis, color=color_dim if color_dim in df_agg else None, template="plotly_white")
+                        fig = px.bar(df_agg, x=x_axis, y=y_axis, color=color_dim if color_dim in df_agg else None, title=f"Media {y_axis} per {x_axis}")
                     else:
-                        fig = px.bar(df, x=x_axis, y=y_axis, color=color_dim, template="plotly_white")
-                
-                st.plotly_chart(fig, use_container_width=True)
+                        fig = px.bar(df, x=x_axis, y=y_axis, color=color_dim, title=f"Bar Chart {x_axis}")
+                elif chart_type == "Heatmap":
+                    if len(numeric_cols) > 1:
+                        corr = df[numeric_cols].corr()
+                        fig = px.imshow(corr, text_auto=True, title="Matrice di Correlazione", color_continuous_scale="RdBu_r")
+                    else:
+                        st.info("Servono almeno 2 colonne numeriche per la Heatmap.")
+
+                if fig:
+                    fig = apply_chart_theme(fig)
+                    st.plotly_chart(fig, use_container_width=True)
             except Exception as e:
-                st.error(f"Impossibile creare il grafico con questa configurazione: {e}")
+                st.error(f"Errore nella creazione del grafico: {e}")
 
     with tab_info:
         st.markdown("### 📖 Origine e Descrizione")
@@ -431,6 +502,7 @@ def main():
     
     # Sidebar Navigation
     st.sidebar.title("🎓 Analytics")
+    st.sidebar.caption("v2.0.0 | BigQuery Powered")
     
     # Stato connessione (nascosto se OK per pulizia, mostrato solo se errore o su richiesta)
     client = get_bigquery_client()
@@ -447,14 +519,17 @@ def main():
         st.stop()
         
     # Menu Navigazione
+    st.sidebar.markdown("### 🧭 Navigazione")
     options = ["🏠 Home Dashboard"] + [f"📄 {t['name']}" for t in tables_info]
-    selection = st.sidebar.radio("Navigazione", options)
+    selection = st.sidebar.radio("", options, label_visibility="collapsed")
     
     st.sidebar.markdown("---")
-    if st.sidebar.button("🔄 Pulisci Cache"):
-        st.cache_data.clear()
-        st.cache_resource.clear()
-        st.rerun()
+    with st.sidebar.expander("⚙️ Impostazioni"):
+        if st.button("🔄 Pulisci Cache"):
+            st.cache_data.clear()
+            st.cache_resource.clear()
+            st.rerun()
+        st.info("Cache TTL: 10 min")
         
     # Routing
     if selection == "🏠 Home Dashboard":
