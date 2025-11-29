@@ -120,425 +120,348 @@ Viene generato automaticamente tramite uno script Python che:
 """
 }
 
-# ─── 3) FUNZIONE DI INIZIALIZZAZIONE DEL CLIENT BIGQUERY (NON CACHED) ─────────────
+# ─── 3) GESTIONE DATI E CACHING OTTIMIZZATO ─────────────────────────────────────
 
-def init_bigquery_client():
+@st.cache_resource
+def get_bigquery_client():
     """
-    Inizializza il client BigQuery utilizzando le credenziali
-    presenti in st.secrets. Ritorna (client, messaggio_status).
-    In caso di errore, client=None e status contiene l'errore.
-    
-    NOTA: Non usa @st.cache_data perché il client BigQuery non è serializzabile
+    Inizializza e cacha il client BigQuery.
+    Usa cache_resource perché il client è un oggetto non serializzabile (connessione).
     """
     try:
-        credentials_dict = {
-            "type": st.secrets["type"],
-            "project_id": st.secrets["project_id"],
-            "private_key_id": st.secrets["private_key_id"],
-            "private_key": st.secrets["private_key"],
-            "client_email": st.secrets["client_email"],
-            "client_id": st.secrets["client_id"],
-            "auth_uri": st.secrets["auth_uri"],
-            "token_uri": st.secrets["token_uri"],
-            "auth_provider_x509_cert_url": st.secrets["auth_provider_x509_cert_url"],
-            "client_x509_cert_url": st.secrets["client_x509_cert_url"],
-            "universe_domain": st.secrets["universe_domain"]
-        }
-
+        # Costruzione credenziali da st.secrets
+        # Nota: Si assume che st.secrets abbia la struttura corretta
+        credentials_dict = dict(st.secrets)
+        
+        # Se le chiavi sono annidate sotto "gcp_service_account" o simili, adattare qui.
+        # Il codice originale assumeva chiavi top-level o quasi. 
+        # Manteniamo la logica originale di estrazione se possibile, ma semplificata.
+        
+        # Tentativo di ricostruire il dizionario credenziali se i secrets sono sparsi
+        if "private_key" in st.secrets:
+             credentials_dict = {
+                "type": st.secrets.get("type"),
+                "project_id": st.secrets.get("project_id"),
+                "private_key_id": st.secrets.get("private_key_id"),
+                "private_key": st.secrets.get("private_key"),
+                "client_email": st.secrets.get("client_email"),
+                "client_id": st.secrets.get("client_id"),
+                "auth_uri": st.secrets.get("auth_uri"),
+                "token_uri": st.secrets.get("token_uri"),
+                "auth_provider_x509_cert_url": st.secrets.get("auth_provider_x509_cert_url"),
+                "client_x509_cert_url": st.secrets.get("client_x509_cert_url"),
+                "universe_domain": st.secrets.get("universe_domain")
+            }
+        
         credentials = service_account.Credentials.from_service_account_info(credentials_dict)
         client = bigquery.Client(credentials=credentials, project=PROJECT_ID)
-
-        # Test di connessione
-        test_query = "SELECT 1 as check_connection"
-        result = client.query(test_query).result()
-        for row in result:
-            if row.check_connection == 1:
-                logger.info("✅ Connessione BigQuery OK")
-                return client, "✅ Connessione BigQuery OK"
-
-        return None, "❌ Test connessione fallito"
-
-    except KeyError as ke:
-        missing = str(ke)
-        error_msg = f"❌ Configurazione mancante: st.secrets non contiene la chiave {missing}"
-        logger.error(error_msg)
-        return None, error_msg
-
+        return client
     except Exception as e:
-        detailed = traceback.format_exc()
-        logger.error(f"Errore BigQuery: {detailed}")
-        return None, f"❌ Errore BigQuery: {str(e)}"
+        logger.error(f"Errore inizializzazione client BQ: {e}")
+        return None
 
-# ─── 4) FUNZIONE PER RECUPERARE METADATI SULLE TABELLE (FIXED CACHING) ────────────
-
-@st.cache_data(ttl=300)
-def get_tables_metadata():
+@st.cache_data(ttl=600, show_spinner=False)
+def get_tables_metadata_cached():
     """
-    Recupera solo i metadati delle tabelle (informazioni serializzabili).
-    Ritorna (lista_dict_tabelle, messaggio_status).
+    Recupera i metadati delle tabelle.
     """
-    client, status = init_bigquery_client()
+    client = get_bigquery_client()
     if not client:
-        return [], status
+        return []
 
     try:
         dataset_ref = client.dataset(DATASET_ID)
-        dataset = client.get_dataset(dataset_ref)
         tables_list = list(client.list_tables(dataset_ref))
-
+        
         tables_info = []
         for table in tables_list:
+            # Per performance, evitiamo get_table per ogni tabella se non strettamente necessario per size precisa
+            # Ma per avere row_count accurato serve get_table.
+            # Ottimizzazione: facciamo get_table solo se serve, ma qui serve per l'overview.
+            # Accettiamo il costo (è cachato).
             table_ref = dataset_ref.table(table.table_id)
-            table_obj = client.get_table(table_ref)
+            t_obj = client.get_table(table_ref)
+            
             tables_info.append({
                 "id": table.table_id,
                 "name": table.table_id,
-                "description": TABLE_DESCRIPTIONS.get(table.table_id, f"Tabella dati: {table.table_id}"),
-                "rows": table_obj.num_rows,
-                "size_mb": round(table_obj.num_bytes / (1024 * 1024), 2) if table_obj.num_bytes else 0,
-                "created": table_obj.created.strftime("%Y-%m-%d") if table_obj.created else "N/A"
+                "description": TABLE_DESCRIPTIONS.get(table.table_id, "N/A"),
+                "rows": t_obj.num_rows,
+                "size_mb": round(t_obj.num_bytes / (1024 * 1024), 2) if t_obj.num_bytes else 0,
+                "created": t_obj.created
             })
-
-        tables_info = sorted(tables_info, key=lambda x: x["id"])
-        return tables_info, f"✅ Trovate {len(tables_info)} tabelle"
-
+            
+        return sorted(tables_info, key=lambda x: x["id"])
     except Exception as e:
-        detailed = traceback.format_exc()
-        logger.error(f"Errore get_tables_metadata: {detailed}")
-        return [], f"❌ Errore nel recupero tabelle: {str(e)}"
+        logger.error(f"Errore metadati: {e}")
+        return []
 
-# ─── 5) FUNZIONE PER CARICARE TUTTI I DATI DI UNA TABELLA (FIXED CACHING) ─────────
-
-@st.cache_data(ttl=300)
-def load_table_data(table_id: str):
+@st.cache_data(ttl=600, show_spinner=False)
+def load_table_data_optimized(table_id: str):
     """
-    Carica l'intera tabella BigQuery in un DataFrame pandas.
-    Ritorna (df_dict, status_message) dove df_dict è un dizionario serializzabile.
+    Carica i dati ottimizzando i tipi per Arrow/Streamlit.
     """
-    client, status = init_bigquery_client()
+    client = get_bigquery_client()
     if not client:
-        return None, status
+        return pd.DataFrame()
 
     try:
         query = f"SELECT * FROM `{PROJECT_ID}.{DATASET_ID}.{table_id}`"
         
-        # Primo tentativo: conversione diretta a DataFrame
-        try:
-            df = client.query(query).to_dataframe()
-        except Exception as e:
-            if "db-dtypes" in str(e).lower():
-                # Fallback: carica i dati come righe e converti manualmente
-                logger.warning(f"db-dtypes non disponibile, uso fallback per {table_id}")
-                query_job = client.query(query)
-                results = query_job.result()
+        # Uso delle BQ Storage API se disponibili (più veloci) tramite to_dataframe
+        df = client.query(query).to_dataframe()
+        
+        # Ottimizzazione tipi per ridurre memoria e migliorare compatibilità Arrow
+        # Convertiamo colonne object che sembrano categorie
+        for col in df.select_dtypes(include=['object']).columns:
+            num_unique = df[col].nunique()
+            num_total = len(df)
+            if num_unique / num_total < 0.5: # Euristica: se pochi valori unici, usa category
+                df[col] = df[col].astype('category')
                 
-                # Converti i risultati in lista di dizionari
-                rows = []
-                for row in results:
-                    row_dict = {}
-                    for key, value in row.items():
-                        # Gestisci tipi speciali di BigQuery
-                        if hasattr(value, 'isoformat'):  # DATE, DATETIME, TIMESTAMP
-                            row_dict[key] = value.isoformat()
-                        elif isinstance(value, bytes):  # BYTES
-                            row_dict[key] = value.decode('utf-8', errors='ignore')
-                        else:
-                            row_dict[key] = value
-                    rows.append(row_dict)
-                
-                # Crea DataFrame dai dizionari
-                df = pd.DataFrame(rows)
-                
-                # Converti colonne numeriche dove possibile
-                for col in df.columns:
-                    if df[col].dtype == 'object':
-                        # Prova a convertire in numerico
-                        try:
-                            df[col] = pd.to_numeric(df[col], errors='ignore')
-                        except:
-                            pass
-                        
-                        # Prova a convertire in datetime
-                        if df[col].dtype == 'object':
-                            try:
-                                df[col] = pd.to_datetime(df[col], errors='ignore')
-                            except:
-                                pass
-            else:
-                raise e
-
-        if df.empty:
-            return {}, f"⚠️ Tabella {table_id} è vuota"
-        else:
-            # Converti DataFrame in formato serializzabile
-            df_dict = {
-                'data': df.to_dict('records'),
-                'columns': df.columns.tolist(),
-                'dtypes': df.dtypes.astype(str).to_dict(),
-                'shape': df.shape
-            }
-            return df_dict, f"✅ Caricate {len(df):,} righe da {table_id}"
-
+        return df
     except Exception as e:
-        detailed = traceback.format_exc()
-        logger.error(f"Errore load_table_data: {detailed}")
-        return None, f"❌ Errore nel caricamento {table_id}: {str(e)}"
-
-def dict_to_dataframe(df_dict):
-    """Converte il dizionario serializzabile in DataFrame pandas."""
-    if not df_dict or 'data' not in df_dict:
+        logger.error(f"Errore caricamento dati {table_id}: {e}")
         return pd.DataFrame()
-    
-    df = pd.DataFrame(df_dict['data'])
-    
-    # Ripristina i tipi di dati dove possibile
-    for col, dtype_str in df_dict.get('dtypes', {}).items():
-        if col in df.columns:
-            try:
-                if 'int' in dtype_str:
-                    df[col] = pd.to_numeric(df[col], errors='ignore')
-                elif 'float' in dtype_str:
-                    df[col] = pd.to_numeric(df[col], errors='ignore')
-                elif 'datetime' in dtype_str:
-                    df[col] = pd.to_datetime(df[col], errors='ignore')
-            except:
-                pass
-                
-    return df
+
+# ─── 4) UI & DESIGN SYSTEM ────────────────────────────────────────────────────
+
+def inject_custom_css():
+    st.markdown("""
+    <style>
+        /* Import Font Inter */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+
+        html, body, [class*="css"]  {
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Sfondo generale più pulito */
+        .stApp {
+            background-color: #f8f9fa; /* Light mode default, dark mode gestito da Streamlit */
+        }
+        
+        /* Dark mode overrides automatici di Streamlit sono buoni, ma rifiniamo le card */
+        [data-testid="stMetric"] {
+            background-color: #ffffff;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            border: 1px solid #e9ecef;
+        }
+        
+        /* Adattamento dark mode per le card */
+        @media (prefers-color-scheme: dark) {
+            [data-testid="stMetric"] {
+                background-color: #262730;
+                border: 1px solid #363940;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            }
+            .stApp {
+                background-color: #0e1117;
+            }
+        }
+
+        /* Sidebar più elegante */
+        [data-testid="stSidebar"] {
+            background-color: #f0f2f6;
+            border-right: 1px solid #e9ecef;
+        }
+        @media (prefers-color-scheme: dark) {
+            [data-testid="stSidebar"] {
+                background-color: #1a1c24;
+                border-right: 1px solid #363940;
+            }
+        }
+
+        /* Headers */
+        h1, h2, h3 {
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+        
+        /* Rimuovere padding eccessivo in alto */
+        .block-container {
+            padding-top: 2rem;
+        }
+        
+        /* Custom spinner */
+        .stSpinner > div {
+            border-top-color: #4F46E5 !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
 
 # ─── 6) FUNZIONI DI RENDERING / VISUALIZZAZIONE DEI DATI ─────────────────────────
 
-def render_overview(tables_info: list):
+def render_home_dashboard(tables_info):
     """
-    Mostra una panoramica generale delle tabelle:
-    - Metriche totali: numero di tabelle, righe complessive, dimensione totale
-    - Tabella dati con nome, descrizione, righe, dimensione, data creazione
+    Dashboard principale con KPI aggregati.
     """
-    st.header("📊 Panoramica del Dataset")
-
-    if not tables_info:
-        st.warning("⚠️ Nessuna tabella trovata nel dataset")
-        return
-
-    # Calcolo metriche
-    total_tabelle = len(tables_info)
-    total_righe = sum(t["rows"] for t in tables_info)
-    total_dimensione = sum(t["size_mb"] for t in tables_info)
-    tipi_diversi = len(set(t["description"] for t in tables_info))
-
+    st.title("🎓 Student Analytics Dashboard")
+    st.markdown("Benvenuto nella piattaforma di analisi dati studenti. Seleziona una sezione dalla sidebar per esplorare i dettagli.")
+    
+    # KPI Cards Row
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("📋 Totale Tabelle", total_tabelle)
-    col2.metric("📊 Totale Righe", f"{total_righe:,}")
-    col3.metric("💾 Dimensione Totale", f"{total_dimensione:.1f} MB")
-    col4.metric("🏷️ Tipi Distinti", tipi_diversi)
+    
+    total_rows = sum(t["rows"] for t in tables_info)
+    total_size = sum(t["size_mb"] for t in tables_info)
+    last_update = max([t["created"] for t in tables_info]) if tables_info else "N/A"
+    if isinstance(last_update, str) and last_update != "N/A":
+        pass # è già stringa
+    elif last_update != "N/A":
+        last_update = last_update.strftime("%d/%m/%Y")
 
+    col1.metric("Dataset Totali", len(tables_info))
+    col2.metric("Record Totali", f"{total_rows:,}")
+    col3.metric("Dimensione Dati", f"{total_size:.1f} MB")
+    col4.metric("Ultimo Aggiornamento", last_update)
+    
     st.markdown("---")
-    st.subheader("🔍 Dettaglio Tabelle")
-
-    df_overview = pd.DataFrame([
-        {
-            "Tabella": t["name"],
-            "Descrizione": t["description"],
-            "Righe": f"{t['rows']:,}",
-            "Dimensione (MB)": f"{t['size_mb']:.2f}",
-            "Data Creazione": t["created"]
-        }
-        for t in tables_info
-    ])
-    st.dataframe(df_overview, use_container_width=True, height=350)
+    
+    st.subheader("📂 Catalogo Dati Disponibili")
+    
+    # Grid layout per le card delle tabelle
+    cols = st.columns(3)
+    for idx, t in enumerate(tables_info):
+        with cols[idx % 3]:
+            with st.container():
+                st.markdown(f"#### 📄 {t['name']}")
+                st.caption(t['description'])
+                st.markdown(f"**Righe:** {t['rows']:,} | **Size:** {t['size_mb']} MB")
+                st.progress(min(1.0, t['rows'] / (total_rows if total_rows > 0 else 1)))
 
 
 def render_table_inspection(df: pd.DataFrame, table_info: dict):
     """
-    Mostra:
-    1. Spiegazione breve dell'origine dei dati e dell'algoritmo utilizzato
-    2. Intestazione con nome tabella e descrizione
-    3. Metriche base: numero righe, colonne, percentuale missing, memoria
-    4. Anteprima (prime 20 righe)
-    5. Selezione colonne da includere/visualizzare
-    6. Grafici base: distribuzioni (istogrammi) e correlazioni (heatmap)
-    7. Sezione "Dati Grezzi e Download" con filtro testuale
+    Visualizzazione dettagliata di una singola tabella.
     """
-    # ─── 6.1) "Origine dei Dati e Algoritmi Utilizzati" ────────────────────────────
-    st.subheader("📖 Origine dei Dati e Algoritmi Utilizzati")
-    origin_text = TABLE_ORIGINS.get(
-        table_info["id"],
-        """Questa tabella contiene dati prodotti durante le fasi di analisi e modellazione.
-- Dati di partenza: informazioni sugli studenti (anagrafica, voti, esami, ecc.).
-- Preprocessing: pulizia, normalizzazione e creazione di nuove feature.
-- Modelli di ML: a seconda della tabella, si usano Random Forest (per churn), K-means (per clustering) 
-  o modelli di Boosted Tree (per soddisfazione).
-- Salvataggio: i risultati vengono memorizzati in BigQuery per permettere visualizzazione e download.
-
-Consulta la sezione "Spiegazione Tabelle" nella sidebar per dettagli specifici su ogni tabella."""
-    )
-    st.markdown(origin_text)
+    # Header con metadati
+    st.title(f"📄 {table_info['name']}")
+    st.markdown(f"*{table_info['description']}*")
+    
+    # Metriche rapide della tabella
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Righe", f"{len(df):,}")
+    m2.metric("Colonne", len(df.columns))
+    missing_pct = round(df.isna().sum().sum() / (len(df) * len(df.columns)) * 100, 2) if not df.empty else 0
+    m3.metric("Missing Values", f"{missing_pct}%")
+    mem_mb = round(df.memory_usage(deep=True).sum() / (1024 * 1024), 2) if not df.empty else 0
+    m4.metric("Memoria", f"{mem_mb} MB")
+    
     st.markdown("---")
 
-    # ─── 6.2) INTESTAZIONE E METRICHE BASE SUI DATI ─────────────────────────────────
-    st.title(f"📈 Analisi: {table_info['description']}")
-    st.markdown("### 📏 Metriche Generali")
+    # Tabs per organizzare la vista
+    tab_data, tab_stats, tab_info = st.tabs(["🔍 Esplora Dati", "📊 Statistiche & Grafici", "ℹ️ Info & Origine"])
+    
+    with tab_data:
+        st.subheader("Anteprima Dati")
+        
+        # Filtri rapidi
+        with st.expander("🔎 Filtri Avanzati", expanded=False):
+            search = st.text_input("Cerca testo in tutte le colonne", placeholder="Digita per filtrare...")
+            cols = st.multiselect("Seleziona colonne", df.columns.tolist(), default=df.columns.tolist()[:8])
+        
+        df_view = df.copy()
+        if search:
+            mask = df_view.astype(str).apply(lambda x: x.str.contains(search, case=False, na=False)).any(axis=1)
+            df_view = df_view[mask]
+        
+        if cols:
+            st.dataframe(df_view[cols].head(100), use_container_width=True, height=400)
+        else:
+            st.warning("Seleziona almeno una colonna.")
+            
+        st.caption(f"Mostrando {min(100, len(df_view))} di {len(df_view)} righe filtratte.")
 
-    col_r, col_c, col_m, col_mem = st.columns(4)
-    col_r.metric("Righe Totali", f"{len(df):,}")
-    col_c.metric("Colonne Totali", f"{len(df.columns)}")
-    missing_pct = round(df.isna().sum().sum() / (len(df) * len(df.columns)) * 100, 2) if len(df) > 0 else 0
-    col_m.metric("Dati Mancanti (%)", f"{missing_pct}%")
-    mem_mb = round(df.memory_usage(deep=True).sum() / (1024 * 1024), 2) if len(df) > 0 else 0
-    col_mem.metric("Memoria Occupata", f"{mem_mb} MB")
-
-    st.markdown("---")
-
-    if len(df) == 0:
-        st.warning("⚠️ La tabella è vuota")
-        return
-
-    # ─── 6.3) ANTEPRIMA E SELEZIONE COLONNE ─────────────────────────────────────────
-    st.subheader("🔍 Anteprima e Selezione Colonne")
-    st.write("**Anteprima (prime 20 righe):**")
-    st.dataframe(df.head(20), use_container_width=True, height=240)
-
-    all_cols = df.columns.tolist()
-    default_cols = all_cols[: min(10, len(all_cols))]
-    selected_cols = st.multiselect(
-        "Scegli le colonne da mostrare (default: prime 10)",
-        options=all_cols,
-        default=default_cols
-    )
-
-    if selected_cols:
-        subset = df[selected_cols]
-        st.write(f"**Visualizzazione colonne selezionate ({len(selected_cols)}):**")
-        st.dataframe(subset.head(20), use_container_width=True, height=200)
-
-    st.markdown("---")
-
-    # ─── 6.4) GRAFICI BASE ─────────────────────────────────────────────────────────
-    st.subheader("📊 Grafici Base")
-    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-
-    if not numeric_cols:
-        st.info("ℹ️ Nessuna colonna numerica disponibile per i grafici.")
-    else:
-        with st.expander("📈 Istogrammi Variabili Numeriche"):
-            selected_num = st.multiselect(
-                "Seleziona fino a 3 variabili numeriche da plottare:",
-                options=numeric_cols,
-                default=numeric_cols[: min(3, len(numeric_cols))],
-                help="Seleziona 1–3 colonne numeriche per visualizzare gli istogrammi"
-            )
-            for col in selected_num:
-                fig = px.histogram(df, x=col, title=f"Istogramma di {col}")
-                fig.update_layout(margin=dict(l=20, r=20, t=40, b=20))
+    with tab_stats:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        cat_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+        
+        col_viz_1, col_viz_2 = st.columns([1, 2])
+        
+        with col_viz_1:
+            st.markdown("### Configurazione Grafico")
+            chart_type = st.selectbox("Tipo Grafico", ["Istogramma", "Box Plot", "Scatter", "Bar Chart"])
+            
+            x_axis = st.selectbox("Asse X", df.columns)
+            y_axis = st.selectbox("Asse Y (Opzionale)", [None] + numeric_cols)
+            color_dim = st.selectbox("Colore (Opzionale)", [None] + df.columns.tolist())
+            
+        with col_viz_2:
+            try:
+                if chart_type == "Istogramma":
+                    fig = px.histogram(df, x=x_axis, y=y_axis, color=color_dim, template="plotly_white")
+                elif chart_type == "Box Plot":
+                    fig = px.box(df, x=x_axis, y=y_axis, color=color_dim, template="plotly_white")
+                elif chart_type == "Scatter":
+                    fig = px.scatter(df, x=x_axis, y=y_axis, color=color_dim, template="plotly_white")
+                elif chart_type == "Bar Chart":
+                    # Aggregazione automatica per bar chart se troppi dati
+                    if len(df) > 1000 and y_axis:
+                        df_agg = df.groupby(x_axis)[y_axis].mean().reset_index()
+                        fig = px.bar(df_agg, x=x_axis, y=y_axis, color=color_dim if color_dim in df_agg else None, template="plotly_white")
+                    else:
+                        fig = px.bar(df, x=x_axis, y=y_axis, color=color_dim, template="plotly_white")
+                
                 st.plotly_chart(fig, use_container_width=True)
+            except Exception as e:
+                st.error(f"Impossibile creare il grafico con questa configurazione: {e}")
 
-        st.markdown("")
+    with tab_info:
+        st.markdown("### 📖 Origine e Descrizione")
+        origin_text = TABLE_ORIGINS.get(table_info["id"], "Nessuna informazione dettagliata disponibile.")
+        st.markdown(origin_text)
 
-        with st.expander("🔗 Matrice delle Correlazioni"):
-            if len(numeric_cols) < 2:
-                st.write("Serve almeno una coppia di variabili numeriche.")
-            else:
-                corr = df[numeric_cols].corr()
-                fig_corr = px.imshow(
-                    corr,
-                    labels=dict(x="Variabile", y="Variabile", color="Correlazione"),
-                    x=numeric_cols,
-                    y=numeric_cols,
-                    color_continuous_scale="RdBu_r",
-                    title="Heatmap Correlazioni"
-                )
-                fig_corr.update_layout(margin=dict(l=20, r=20, t=40, b=20), height=600)
-                st.plotly_chart(fig_corr, use_container_width=True)
-
-    st.markdown("---")
-
-    # ─── 6.5) DATI GREZZI E DOWNLOAD ───────────────────────────────────────────────
-    st.subheader("📋 Dati Grezzi e Download")
-    search_term = st.text_input("🔎 Cerca testo nei dati (su tutte le colonne):")
-    df_search = df.copy()
-
-    if search_term:
-        mask = df_search.astype(str).apply(lambda row: row.str.contains(search_term, case=False, na=False)).any(axis=1)
-        df_search = df_search[mask]
-        st.info(f"Trovate {len(df_search):,} righe contenenti '{search_term}'")
-
-    st.dataframe(df_search.reset_index(drop=True), use_container_width=True, height=300)
-
-    csv = df_search.to_csv(index=False).encode("utf-8")
-    st.download_button(
-        label="📥 Scarica i dati in CSV",
-        data=csv,
-        file_name=f"{table_info['name']}_export.csv",
-        mime="text/csv",
-        help="Scarica un file CSV con i dati visualizzati."
-    )
-
-
-# ─── 7) FUNZIONE PRINCIPALE (ENTRY POINT) ────────────────────────────────────────
+# ─── 7) MAIN APP ──────────────────────────────────────────────────────────────
 
 def main():
-    st.sidebar.title("🎓 Student Analytics Dashboard")
-    st.sidebar.markdown("""
-    Benvenuto! Questa applicazione ti permette di esplorare **tutti i dati** delle tabelle
-    presenti nel dataset BigQuery, con un'interfaccia semplice e intuitiva.
-    """)
-
-    # ─── 7.1) CONNESSIONE A BIGQUERY ───────────────────────────────────────────────
-    with st.sidebar.expander("🔌 Configurazione Connessione BigQuery", expanded=True):
-        client, conn_status = init_bigquery_client()
-        if "✅" in conn_status:
-            st.sidebar.success(conn_status)
-        else:
-            st.sidebar.error(conn_status)
-            st.error("❌ Impossibile connettersi a BigQuery. Verifica i segreti e i permessi.")
-            st.stop()
-
-    # ─── 7.2) RECUPERO METADATI SULLE TABELLE ───────────────────────────────────────
-    with st.spinner("📡 Recupero tabelle..."):
-        tables_info, tables_status = get_tables_metadata()
-
+    inject_custom_css()
+    
+    # Sidebar Navigation
+    st.sidebar.title("🎓 Analytics")
+    
+    # Stato connessione (nascosto se OK per pulizia, mostrato solo se errore o su richiesta)
+    client = get_bigquery_client()
+    if not client:
+        st.error("❌ Errore critico: Impossibile connettersi a BigQuery.")
+        st.stop()
+        
+    # Caricamento metadati (cached)
+    with st.spinner("Caricamento catalogo..."):
+        tables_info = get_tables_metadata_cached()
+    
     if not tables_info:
-        st.sidebar.error(tables_status)
-        st.error("❌ Errore nel recupero delle tabelle. Controlla i log.")
+        st.warning("Nessuna tabella trovata.")
         st.stop()
-    else:
-        st.sidebar.success(tables_status)
-
-    # ─── 7.3) "Spiegazione Tabelle" NELLA SIDEBAR ─────────────────────────────────
-    with st.sidebar.expander("📖 Spiegazione Tabelle", expanded=False):
-        for t in tables_info:
-            descr = TABLE_DESCRIPTIONS.get(t["id"], f"Tabella dati: {t['id']}")
-            st.markdown(f"**{t['name']}**: {descr}")
-
-    # ─── 7.4) SELEZIONE DELLA TABELLA ─────────────────────────────────────────────
+        
+    # Menu Navigazione
+    options = ["🏠 Home Dashboard"] + [f"📄 {t['name']}" for t in tables_info]
+    selection = st.sidebar.radio("Navigazione", options)
+    
     st.sidebar.markdown("---")
-    st.sidebar.subheader("📋 Seleziona Tabella")
-    table_names = [t["name"] for t in tables_info]
-    sel_table = st.sidebar.selectbox("Scegli la tabella da analizzare:", options=table_names)
-
-    current_info = next((t for t in tables_info if t["name"] == sel_table), None)
-
-    # ─── 7.5) CARICAMENTO DEI DATI (TUTTI) ────────────────────────────────────────
-    with st.spinner(f"⏳ Caricamento dati da {sel_table}..."):
-        df_dict, load_msg = load_table_data(sel_table)
-
-    if df_dict is None:
-        st.sidebar.error(load_msg)
-        st.error(f"❌ Errore: {load_msg}")
-        st.stop()
-    else:
-        st.sidebar.success(load_msg)
-        df = dict_to_dataframe(df_dict)
-
-    # ─── 7.6) PULSANTE DI REFRESH DELLA CACHE ─────────────────────────────────────
-    st.sidebar.markdown("---")
-    if st.sidebar.button("🔄 Ricarica Dati (cancella cache)"):
+    if st.sidebar.button("🔄 Pulisci Cache"):
         st.cache_data.clear()
+        st.cache_resource.clear()
         st.rerun()
-
-    # ─── 7.7) RENDERING DELL'ANALISI PRINCIPALE ──────────────────────────────────
-    render_table_inspection(df, current_info)
-
+        
+    # Routing
+    if selection == "🏠 Home Dashboard":
+        render_home_dashboard(tables_info)
+    else:
+        # Estrai nome tabella
+        table_name = selection.split("📄 ")[1]
+        current_info = next((t for t in tables_info if t["name"] == table_name), None)
+        
+        if current_info:
+            with st.spinner(f"Caricamento dati {table_name}..."):
+                df = load_table_data_optimized(table_name)
+                
+            if not df.empty:
+                render_table_inspection(df, current_info)
+            else:
+                st.warning(f"La tabella {table_name} è vuota o impossibile da caricare.")
 
 if __name__ == "__main__":
     main()
