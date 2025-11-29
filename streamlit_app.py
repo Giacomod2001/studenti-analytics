@@ -307,24 +307,46 @@ def inject_custom_css():
 
 def apply_chart_theme(fig):
     """
-    Applies a custom 'Premium' theme to Plotly charts.
+    Applies a minimal, clean theme to Plotly charts.
+    Focus on readability with minimal colors.
     """
     fig.update_layout(
-        template="plotly_white",
-        font=dict(family="Inter, sans-serif", size=12, color="#333333"),
-        title_font=dict(family="Inter, sans-serif", size=18, color="#111111", weight=700),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        margin=dict(l=20, r=20, t=50, b=20),
+        template="simple_white",
+        font=dict(family="Inter, sans-serif", size=11, color="#1f2937"),
+        title_font=dict(family="Inter, sans-serif", size=16, color="#111827"),
+        paper_bgcolor="white",
+        plot_bgcolor="white",
+        margin=dict(l=40, r=40, t=60, b=40),
         hoverlabel=dict(
             bgcolor="white",
-            font_size=12,
-            font_family="Inter, sans-serif"
+            font_size=11,
+            font_family="Inter, sans-serif",
+            bordercolor="#e5e7eb"
         ),
-        colorway=px.colors.qualitative.Bold
+        showlegend=True,
+        legend=dict(
+            bgcolor="white",
+            bordercolor="#e5e7eb",
+            borderwidth=1
+        )
     )
-    fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='#f0f2f6')
-    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='#f0f2f6')
+    # Minimal grid lines
+    fig.update_xaxes(
+        showgrid=True, 
+        gridwidth=1, 
+        gridcolor='#f3f4f6',
+        showline=True,
+        linewidth=1,
+        linecolor='#d1d5db'
+    )
+    fig.update_yaxes(
+        showgrid=True, 
+        gridwidth=1, 
+        gridcolor='#f3f4f6',
+        showline=True,
+        linewidth=1,
+        linecolor='#d1d5db'
+    )
     return fig
 
 def render_home_dashboard(tables_info):
@@ -380,52 +402,86 @@ def render_home_dashboard(tables_info):
 
 def create_specialized_chart(df: pd.DataFrame, table_id: str):
     """
-    Creates specialized charts for ML tables.
+    Creates minimal, clean specialized charts for ML tables.
     """
+    NEUTRAL_COLOR = '#6b7280'  # Neutral gray
+    ACCENT_COLOR = '#3b82f6'   # Clean blue
+    
     if table_id == "studenti_churn_pred" and 'prob_churn' in df.columns:
-        # Churn Probability Distribution
-        fig = px.histogram(
-            df, 
-            x='prob_churn', 
-            nbins=30,
+        # Clean bar chart instead of filled histogram
+        fig = go.Figure()
+        
+        # Create bins
+        hist_data = np.histogram(df['prob_churn'], bins=20)
+        
+        fig.add_trace(go.Bar(
+            x=hist_data[1][:-1],
+            y=hist_data[0],
+            marker=dict(
+                color=NEUTRAL_COLOR,
+                line=dict(color='white', width=2)
+            ),
+            name='Students'
+        ))
+        
+        fig.update_layout(
             title="Dropout Probability Distribution",
-            labels={'prob_churn': 'Dropout Probability', 'count': 'Number of Students'},
-            color_discrete_sequence=['#4f46e5']
+            xaxis_title="Dropout Probability",
+            yaxis_title="Number of Students",
+            bargap=0.1
         )
         return apply_chart_theme(fig)
     
     elif table_id == "feature_importance_studenti":
-        # Feature Importance Horizontal Bar Chart (sorted)
+        # Clean horizontal bar chart with single color
         importance_cols = [col for col in df.columns if 'importance' in col.lower() or 'peso' in col.lower() or 'percentuale' in col.lower()]
         feature_col = next((col for col in df.columns if 'feature' in col.lower() or 'caratteristica' in col.lower()), df.columns[0])
         
         if importance_cols:
             df_sorted = df.sort_values(by=importance_cols[0], ascending=True).tail(15)
-            fig = px.bar(
-                df_sorted,
-                y=feature_col,
-                x=importance_cols[0],
+            
+            fig = go.Figure()
+            fig.add_trace(go.Bar(
+                y=df_sorted[feature_col],
+                x=df_sorted[importance_cols[0]],
                 orientation='h',
+                marker=dict(
+                    color=ACCENT_COLOR,
+                    line=dict(color='white', width=1)
+                ),
+                name='Importance'
+            ))
+            
+            fig.update_layout(
                 title="Top 15 Features by Importance",
-                labels={feature_col: 'Feature', importance_cols[0]: 'Importance'},
-                color=importance_cols[0],
-                color_continuous_scale='Viridis'
+                xaxis_title="Importance Score",
+                yaxis_title="Feature",
+                height=500
             )
             return apply_chart_theme(fig)
     
     elif table_id == "studenti_cluster":
-        # Cluster Analysis: Distribution by Cluster
+        # Simple bar chart with neutral colors
         cluster_col = next((col for col in df.columns if 'cluster' in col.lower()), None)
         if cluster_col:
-            cluster_counts = df[cluster_col].value_counts().reset_index()
+            cluster_counts = df[cluster_col].value_counts().sort_index().reset_index()
             cluster_counts.columns = ['Cluster', 'Count']
-            fig = px.bar(
-                cluster_counts,
-                x='Cluster',
-                y='Count',
+            
+            fig = go.Figure()
+            fig.add_trace(go.Bar(
+                x=cluster_counts['Cluster'].astype(str),
+                y=cluster_counts['Count'],
+                marker=dict(
+                    color=NEUTRAL_COLOR,
+                    line=dict(color='white', width=2)
+                ),
+                name='Students'
+            ))
+            
+            fig.update_layout(
                 title="Student Distribution by Cluster",
-                color='Cluster',
-                color_continuous_scale='Turbo'
+                xaxis_title="Cluster ID",
+                yaxis_title="Number of Students"
             )
             return apply_chart_theme(fig)
     
@@ -507,22 +563,53 @@ def render_table_inspection(df: pd.DataFrame, table_info: dict):
         with col_viz_2:
             try:
                 fig = None
+                # Default neutral color
+                default_color = '#6b7280'
+                
                 if chart_type == "Histogram":
-                    fig = px.histogram(df, x=x_axis, y=y_axis, color=color_dim, title=f"Distribution of {x_axis}")
+                    fig = px.histogram(
+                        df, x=x_axis, y=y_axis, color=color_dim, 
+                        title=f"Distribution of {x_axis}",
+                        color_discrete_sequence=[default_color] if not color_dim else None
+                    )
                 elif chart_type == "Box Plot":
-                    fig = px.box(df, x=x_axis, y=y_axis, color=color_dim, title=f"Box Plot {x_axis}")
+                    fig = px.box(
+                        df, x=x_axis, y=y_axis, color=color_dim, 
+                        title=f"Box Plot {x_axis}",
+                        color_discrete_sequence=[default_color] if not color_dim else None
+                    )
                 elif chart_type == "Scatter":
-                    fig = px.scatter(df, x=x_axis, y=y_axis, color=color_dim, title=f"Scatter {x_axis} vs {y_axis}")
+                    fig = px.scatter(
+                        df, x=x_axis, y=y_axis, color=color_dim, 
+                        title=f"Scatter {x_axis} vs {y_axis}",
+                        color_discrete_sequence=[default_color] if not color_dim else None
+                    )
                 elif chart_type == "Bar Chart":
                     if len(df) > 1000 and y_axis:
                         df_agg = df.groupby(x_axis)[y_axis].mean().reset_index()
-                        fig = px.bar(df_agg, x=x_axis, y=y_axis, color=color_dim if color_dim in df_agg else None, title=f"Average {y_axis} by {x_axis}")
+                        fig = px.bar(
+                            df_agg, x=x_axis, y=y_axis, 
+                            color=color_dim if color_dim in df_agg else None, 
+                            title=f"Average {y_axis} by {x_axis}",
+                            color_discrete_sequence=[default_color] if not color_dim or color_dim not in df_agg else None
+                        )
                     else:
-                        fig = px.bar(df, x=x_axis, y=y_axis, color=color_dim, title=f"Bar Chart {x_axis}")
+                        fig = px.bar(
+                            df, x=x_axis, y=y_axis, color=color_dim, 
+                            title=f"Bar Chart {x_axis}",
+                            color_discrete_sequence=[default_color] if not color_dim else None
+                        )
                 elif chart_type == "Heatmap":
                     if len(numeric_cols) > 1:
                         corr = df[numeric_cols].corr()
-                        fig = px.imshow(corr, text_auto=True, title="Correlation Matrix", color_continuous_scale="RdBu_r")
+                        # Minimal heatmap with white-to-blue scale
+                        fig = px.imshow(
+                            corr, 
+                            text_auto='.2f', 
+                            title="Correlation Matrix", 
+                            color_continuous_scale=['#ffffff', '#3b82f6'],
+                            aspect="auto"
+                        )
                     else:
                         st.info("Need at least 2 numerical columns for Heatmap.")
 
