@@ -2,12 +2,13 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
+import plotly.graph_objects as go
 from google.cloud import bigquery
 from google.oauth2 import service_account
 import traceback
 import logging
 
-# ─── 1) CONFIGURAZIONE DELLA PAGINA E DEL LOG ─────────────────────────────────
+# ─── 1) PAGE CONFIGURATION ─────────────────────────────────────────────────
 
 st.set_page_config(
     page_title="🎓 Student Analytics Dashboard",
@@ -22,117 +23,125 @@ logger = logging.getLogger(__name__)
 PROJECT_ID = "laboratorio-ai-460517"
 DATASET_ID = "dataset"
 
-# ─── 2) MAPPA DELLE DESCRIZIONI E ORIGINI DEI DATI ───────────────────────────────
+# ─── 2) DATA DESCRIPTIONS AND ORIGINS ──────────────────────────────────────
 
-# Descrizioni "uman‐readable" di ogni tabella presente in BigQuery
-TABLE_DESCRIPTIONS = {
-    "studenti": "Dati anagrafici e performance degli studenti",
-    "studenti_churn_pred": "Previsioni di abbandono scolastico con probabilità",
-    "studenti_cluster": "Segmentazione degli studenti tramite clustering",
-    "studenti_soddisfazione_btr": "Analisi della soddisfazione degli studenti",
-    "feature_importance_studenti": "Importanza delle variabili nel modello predittivo",
-    "report_finale_soddisfazione_studenti": "Report completo dell'analisi di soddisfazione",
-    "student_churn_rf": "Dettagli del modello Random Forest per la previsione di abbandono",
-    "student_kmeans": "Dettagli del modello K-means per clustering comportamentale"
+# Display names mapping (DB name -> Human readable name)
+TABLE_DISPLAY_NAMES = {
+    "studenti": "Students Data",
+    "studenti_churn_pred": "Dropout Prediction",
+    "studenti_cluster": "Student Clustering",
+    "studenti_soddisfazione_btr": "Satisfaction Analysis",
+    "feature_importance_studenti": "Feature Importance",
+    "report_finale_soddisfazione_studenti": "Satisfaction Report",
+    "student_churn_rf": "Churn Model Details",
+    "student_kmeans": "K-means Model Details"
 }
 
-# Spiegazione di come sono stati generati i dati per ogni tabella (pipeline e algoritmi)
+TABLE_DESCRIPTIONS = {
+    "studenti": "Student demographic and performance data",
+    "studenti_churn_pred": "Dropout predictions with probability scores",
+    "studenti_cluster": "Student segmentation via clustering",
+    "studenti_soddisfazione_btr": "Student satisfaction analysis",
+    "feature_importance_studenti": "Feature importance from predictive model",
+    "report_finale_soddisfazione_studenti": "Complete satisfaction analysis report",
+    "student_churn_rf": "Random Forest model details for dropout prediction",
+    "student_kmeans": "K-means model details for behavioral clustering"
+}
+
 TABLE_ORIGINS = {
-    "studenti": """**Origine:**
+    "studenti": """**Origin:**
 
-La tabella `studenti` raccoglie le informazioni anagrafiche e le metriche di performance di ogni studente.
-I dati di partenza provengono dal gestionale dell'università (registro studenti, voti, esami sostenuti, ecc.).
-Prima di caricarli in BigQuery, è stato eseguito un processo di pulizia e normalizzazione:
-- Rimozione di record duplicati
-- Uniformazione dei formati di data e di stringa
-- Calcolo di nuove feature (ad esempio, media voti, numero di esami sostenuti)
+The `students` table collects demographic information and performance metrics for each student.
+Source data comes from the university management system (student registry, grades, exams taken, etc.).
+Before loading into BigQuery, a cleaning and normalization process was performed:
+- Removal of duplicate records
+- Standardization of date and string formats
+- Calculation of new features (e.g., average grades, number of exams taken)
 """,
-    "studenti_churn_pred": """**Origine:**
+    "studenti_churn_pred": """**Origin:**
 
-Questa tabella contiene le previsioni di abbandono scolastico (churn) generate da un modello di Machine Learning di tipo **Random Forest**.
-**Passaggi principali della pipeline:**
-1. Caricamento e pulizia dei dati di base da `studenti` e tabelle correlate.
-2. Feature engineering: selezione e trasformazione delle variabili più rilevanti (ad esempio: media dei voti, ore di studio, partecipazione a eventi).
-3. Suddivisione del dataset in training e test set.
-4. Addestramento del modello Random Forest (con ottimizzazione dei parametri tramite cross-validation).
-5. Calcolo delle probabilità di churn per ogni studente (colonna `prob_churn`) e della classe predetta (churn sì/no).
-6. Salvataggio dei risultati in questa tabella, insieme a livello di confidenza e label predetta.
+This table contains dropout (churn) predictions generated by a **Random Forest** Machine Learning model.
+**Main pipeline steps:**
+1. Loading and cleaning base data from `students` and related tables.
+2. Feature engineering: selection and transformation of the most relevant variables (e.g., average grades, study hours, event participation).
+3. Splitting the dataset into training and test sets.
+4. Training the Random Forest model (with parameter optimization via cross-validation).
+5. Calculating churn probabilities for each student (`prob_churn` column) and predicted class (churn yes/no).
+6. Saving results to this table, along with confidence level and predicted label.
 """,
-    "student_churn_rf": """**Origine:**
+    "student_churn_rf": """**Origin:**
 
-Questa tabella contiene i dettagli e le metriche del modello **Random Forest** usato per predire l'abbandono scolastico.
-Ogni riga riporta:
-- Una metrica di performance (es. accuracy, precision, recall) calcolata sul test set.
-- I parametri ottimali utilizzati (numero di alberi, profondità massima, ecc.).
-Viene generata durante la fase di validazione, dopo aver eseguito hyperparameter tuning e aver misurato le prestazioni su un hold-out set.
+This table contains the details and metrics of the **Random Forest** model used to predict dropout.
+Each row shows:
+- A performance metric (e.g., accuracy, precision, recall) calculated on the test set.
+- The optimal parameters used (number of trees, max depth, etc.).
+Generated during the validation phase, after hyperparameter tuning and measuring performance on a hold-out set.
 """,
-    "feature_importance_studenti": """**Origine:**
+    "feature_importance_studenti": """**Origin:**
 
-Questa tabella mostra l'importanza delle variabili (feature importance) estratte dal modello di Random Forest `student_churn_rf`.
-Per ogni caratteristica (`caratteristica`) sono presenti:
-- `peso_importanza`: numero di volte in cui la feature è stata selezionata per una divisione nei vari alberi del modello.
-- `guadagno_informazione`: somma dell'informazione guadagnata, che indica quanto la feature ha contribuito a ridurre l'impurità.
-- `copertura`: numero totale di esempi nel dataset che hanno attraversato un nodo che usa quella feature.
-- `percentuale_importanza`: peso normalizzato su scala [0,100].
-- `categoria_importanza`: etichetta qualitativa (per esempio: "Molto Importante", "Moderatamente Importante", "Poco Importante").
-Questa tabella viene generata prendendo i valori di `feature_importances_` di scikit-learn dal modello e salvandoli su BigQuery.
+This table shows the feature importance extracted from the `student_churn_rf` Random Forest model.
+For each characteristic (`feature`) it includes:
+- `importance_weight`: number of times the feature was selected for a split in the various trees of the model.
+- `information_gain`: sum of information gained, indicating how much the feature contributed to reducing impurity.
+- `coverage`: total number of examples in the dataset that passed through a node using that feature.
+- `importance_percentage`: normalized weight on a [0,100] scale.
+- `importance_category`: qualitative label (e.g., "Very Important", "Moderately Important", "Less Important").
+This table is generated by taking the `feature_importances_` values from scikit-learn and saving them to BigQuery.
 """,
-    "studenti_cluster": """**Origine:**
+    "studenti_cluster": """**Origin:**
 
-La tabella `studenti_cluster` assegna ogni studente a un cluster, ottenuto tramite l'algoritmo **K-means**.
-**Passaggi principali:**
-1. Selezione di feature numeriche significative (es. ore di studio settimanali, media voti, numero di assenze).
-2. Standardizzazione delle variabili (scaling) in modo che abbiano media = 0 e varianza = 1.
-3. Addestramento di K-means con K = 4 (numero di cluster scelto via elbow method).
-4. Calcolo del centroide per ogni cluster e assegnazione dell'etichetta `cluster_id` a ciascuno studente.
-5. Salvataggio in questa tabella di `cluster_id`, delle coordinate dei centroidi e della distanza di ciascuno studente dal proprio centroide.
+The `student_cluster` table assigns each student to a cluster, obtained via the **K-means** algorithm.
+**Main steps:**
+1. Selection of significant numerical features (e.g., weekly study hours, average grades, number of absences).
+2. Variable standardization (scaling) so they have mean = 0 and variance = 1.
+3. Training K-means with K = 4 (number of clusters chosen via elbow method).
+4. Calculation of the centroid for each cluster and assignment of the `cluster_id` label to each student.
+5. Saving to this table of `cluster_id`, centroid coordinates, and distance of each student from their centroid.
 """,
-    "student_kmeans": """**Origine:**
+    "student_kmeans": """**Origin:**
 
-Questa tabella contiene i dettagli dell'algoritmo **K-means (K = 4)** utilizzato per il clustering degli studenti.
-Include:
-- Le coordinate dei centroidi di ciascun cluster.
-- L'inertia (somma delle distanze al quadrato dei punti dal rispettivo centroide) per ogni iterazione (utile per verificare la convergenza).
-Viene creata durante l'addestramento di K-means per analizzare la qualità della suddivisione.
+This table contains the details of the **K-means (K = 4)** algorithm used for student clustering.
+Includes:
+- The coordinates of the centroids of each cluster.
+- The inertia (sum of squared distances of points from their respective centroid) for each iteration (useful for verifying convergence).
+Created during K-means training to analyze the quality of the subdivision.
 """,
-    "studenti_soddisfazione_btr": """**Origine:**
+    "studenti_soddisfazione_btr": """**Origin:**
 
-Questa tabella registra i risultati di un modello di regressione **Boosted Tree** (ad esempio XGBoost) usato per stimare il livello di soddisfazione degli studenti.
-**Passaggi principali:**
-1. Raccolta dei questionari di soddisfazione (scale Likert 1-5).
-2. Pulizia e ricodifica delle risposte (ad esempio, trasformazione in valori numerici).
-3. Creazione di feature descrittive (es. numero di eventi frequentati, media voti, reddito familiare).
-4. Addestramento del modello di regressione Boosted Tree per predire il punteggio di soddisfazione.
-5. Calcolo delle metriche di performance (R², RMSE) su un hold-out set.
-6. Salvataggio dei risultati in questa tabella, con stima del punteggio, intervalli di confidenza e feature più influenti.
+This table records the results of a **Boosted Tree** regression model (e.g., XGBoost) used to estimate student satisfaction levels.
+**Main steps:**
+1. Collection of satisfaction questionnaires (Likert scale 1-5).
+2. Cleaning and recoding of responses (e.g., transformation into numerical values).
+3. Creation of descriptive features (e.g., number of events attended, average grades, family income).
+4. Training the Boosted Tree regression model to predict the satisfaction score.
+5. Calculation of performance metrics (R², RMSE) on a hold-out set.
+6. Saving results to this table, with score estimates, confidence intervals, and most influential features.
 """,
-    "report_finale_soddisfazione_studenti": """**Origine:**
+    "report_finale_soddisfazione_studenti": """**Origin:**
 
-Questo report riassume l'analisi di soddisfazione degli studenti, basata sui risultati di `studenti_soddisfazione_btr`.
-Include:
-- Grafici di distribuzione dei punteggi di soddisfazione.
-- Confronto tra corsi di laurea e cluster di studenti.
-- Suggerimenti operativi per migliorare l'esperienza studentesca.
-Viene generato automaticamente tramite uno script Python che:
-1. Crea diverse viste (view) in BigQuery.
-2. Aggrega i dati in tabelle di sintesi.
-3. Produce un PDF/HTML finale da condividere con il team di progetto.
+This report summarizes the student satisfaction analysis, based on the results of `student_satisfaction_btr`.
+Includes:
+- Distribution charts of satisfaction scores.
+- Comparison between degree programs and student clusters.
+- Operational suggestions to improve the student experience.
+Generated automatically via a Python script that:
+1. Creates various views in BigQuery.
+2. Aggregates data into summary tables.
+3. Produces a final PDF/HTML to share with the project team.
 """
 }
 
-# ─── 3) GESTIONE DATI E CACHING OTTIMIZZATO ─────────────────────────────────────
+# ─── 3) DATA MANAGEMENT AND OPTIMIZED CACHING ──────────────────────────────
 
 @st.cache_resource
 def get_bigquery_client():
     """
-    Inizializza e cacha il client BigQuery.
-    Usa cache_resource perché il client è un oggetto non serializzabile (connessione).
+    Initializes and caches the BigQuery client.
+    Uses cache_resource because the client is a non-serializable object (connection).
     """
     try:
-        # Costruzione credenziali da st.secrets
         credentials_dict = dict(st.secrets)
         
-        # Tentativo di ricostruire il dizionario credenziali se i secrets sono sparsi
         if "private_key" in st.secrets:
              credentials_dict = {
                 "type": st.secrets.get("type"),
@@ -152,14 +161,14 @@ def get_bigquery_client():
         client = bigquery.Client(credentials=credentials, project=PROJECT_ID)
         return client
     except Exception as e:
-        st.error(f"Errore inizializzazione client BQ: {e}")
-        logger.error(f"Errore inizializzazione client BQ: {e}")
+        st.error(f"Error initializing BQ client: {e}")
+        logger.error(f"Error initializing BQ client: {e}")
         return None
 
 @st.cache_data(ttl=600, show_spinner=False)
 def get_tables_metadata_cached():
     """
-    Recupera i metadati delle tabelle.
+    Retrieves table metadata.
     """
     client = get_bigquery_client()
     if not client:
@@ -176,7 +185,7 @@ def get_tables_metadata_cached():
             
             tables_info.append({
                 "id": table.table_id,
-                "name": table.table_id,
+                "name": TABLE_DISPLAY_NAMES.get(table.table_id, table.table_id),
                 "description": TABLE_DESCRIPTIONS.get(table.table_id, "N/A"),
                 "rows": t_obj.num_rows,
                 "size_mb": round(t_obj.num_bytes / (1024 * 1024), 2) if t_obj.num_bytes else 0,
@@ -185,14 +194,14 @@ def get_tables_metadata_cached():
             
         return sorted(tables_info, key=lambda x: x["id"])
     except Exception as e:
-        st.error(f"Errore recupero metadati: {e}")
-        logger.error(f"Errore metadati: {e}")
+        st.error(f"Error retrieving metadata: {e}")
+        logger.error(f"Error metadata: {e}")
         return []
 
 @st.cache_data(ttl=600, show_spinner=False)
 def load_table_data_optimized(table_id: str):
     """
-    Carica i dati ottimizzando i tipi per Arrow/Streamlit.
+    Loads data optimizing types for Arrow/Streamlit.
     """
     client = get_bigquery_client()
     if not client:
@@ -201,17 +210,17 @@ def load_table_data_optimized(table_id: str):
     try:
         query = f"SELECT * FROM `{PROJECT_ID}.{DATASET_ID}.{table_id}`"
         
-        # Tentativo 1: BQ Storage API (veloce)
+        # Attempt 1: BQ Storage API (fast)
         try:
             df = client.query(query).to_dataframe()
         except Exception as e_fast:
-            logger.warning(f"Fast loading fallito per {table_id}: {e_fast}")
-            # Tentativo 2: REST API standard
+            logger.warning(f"Fast loading failed for {table_id}: {e_fast}")
+            # Attempt 2: REST API standard
             try:
                 df = client.query(query).to_dataframe(create_bqstorage_client=False)
             except Exception as e_rest:
-                logger.warning(f"REST loading fallito per {table_id}: {e_rest}")
-                # Tentativo 3: Manuale (lento ma sicuro, non richiede db-dtypes)
+                logger.warning(f"REST loading failed for {table_id}: {e_rest}")
+                # Attempt 3: Manual (slow but safe, doesn't require db-dtypes)
                 try:
                     job = client.query(query)
                     rows = [dict(row) for row in job.result()]
@@ -219,39 +228,35 @@ def load_table_data_optimized(table_id: str):
                 except Exception as e_manual:
                     raise e_manual
 
-        # Ottimizzazione tipi per ridurre memoria e migliorare compatibilità Arrow
-        # Convertiamo colonne object che sembrano categorie
+        # Type optimization to reduce memory and improve Arrow compatibility
         if not df.empty:
             for col in df.select_dtypes(include=['object']).columns:
                 num_unique = df[col].nunique()
                 num_total = len(df)
-                if num_total > 0 and num_unique / num_total < 0.5: # Euristica
+                if num_total > 0 and num_unique / num_total < 0.5:
                     df[col] = df[col].astype('category')
                 
         return df
     except Exception as e:
-        st.error(f"Errore caricamento dati {table_id}: {e}")
-        logger.error(f"Errore caricamento dati {table_id}: {e}")
+        st.error(f"Error loading data {table_id}: {e}")
+        logger.error(f"Error loading data {table_id}: {e}")
         return pd.DataFrame()
 
-# ─── 4) UI & DESIGN SYSTEM ────────────────────────────────────────────────────
+# ─── 4) UI & DESIGN SYSTEM ─────────────────────────────────────────────────
 
 def inject_custom_css():
     st.markdown("""
     <style>
-        /* Import Font Inter */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
 
         html, body, [class*="css"]  {
             font-family: 'Inter', sans-serif;
         }
 
-        /* Sfondo generale più pulito */
         .stApp {
-            background-color: #f8f9fa; /* Light mode default, dark mode gestito da Streamlit */
+            background-color: #f8f9fa;
         }
         
-        /* Dark mode overrides automatici di Streamlit sono buoni, ma rifiniamo le card */
         [data-testid="stMetric"] {
             background-color: #ffffff;
             padding: 15px;
@@ -260,7 +265,6 @@ def inject_custom_css():
             border: 1px solid #e9ecef;
         }
         
-        /* Adattamento dark mode per le card */
         @media (prefers-color-scheme: dark) {
             [data-testid="stMetric"] {
                 background-color: #262730;
@@ -272,7 +276,6 @@ def inject_custom_css():
             }
         }
 
-        /* Sidebar più elegante */
         [data-testid="stSidebar"] {
             background-color: #f0f2f6;
             border-right: 1px solid #e9ecef;
@@ -284,18 +287,15 @@ def inject_custom_css():
             }
         }
 
-        /* Headers */
         h1, h2, h3 {
             font-weight: 700;
             letter-spacing: -0.5px;
         }
         
-        /* Rimuovere padding eccessivo in alto */
         .block-container {
             padding-top: 2rem;
         }
         
-        /* Custom spinner */
         .stSpinner > div {
             border-top-color: #4F46E5 !important;
         }
@@ -303,11 +303,11 @@ def inject_custom_css():
     """, unsafe_allow_html=True)
 
 
-# ─── 6) FUNZIONI DI RENDERING / VISUALIZZAZIONE DEI DATI ─────────────────────────
+# ─── 5) RENDERING / DATA VISUALIZATION FUNCTIONS ────────────────────────────
 
 def apply_chart_theme(fig):
     """
-    Applica un tema personalizzato 'Premium' ai grafici Plotly.
+    Applies a custom 'Premium' theme to Plotly charts.
     """
     fig.update_layout(
         template="plotly_white",
@@ -321,7 +321,7 @@ def apply_chart_theme(fig):
             font_size=12,
             font_family="Inter, sans-serif"
         ),
-        colorway=px.colors.qualitative.Bold  # Palette colori professionale
+        colorway=px.colors.qualitative.Bold
     )
     fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='#f0f2f6')
     fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='#f0f2f6')
@@ -329,18 +329,17 @@ def apply_chart_theme(fig):
 
 def render_home_dashboard(tables_info):
     """
-    Dashboard principale con KPI aggregati e sezione About.
+    Main dashboard with aggregated KPIs and About section.
     """
     st.title("🎓 Student Analytics Dashboard")
     
-    # Sezione About
+    # About Section
     st.markdown("""
     <div style="background-color: #eef2ff; padding: 20px; border-radius: 10px; border-left: 5px solid #4f46e5; margin-bottom: 25px;">
-        <h4 style="color: #4f46e5; margin-top: 0;">ℹ️ About this Dashboard</h4>
+        <h4 style="color: #4f46e5; margin-top: 0;">ℹ️ About this Platform</h4>
         <p style="margin-bottom: 0; color: #374151;">
-            Streamlit dashboard for student analytics powered by <b>Google BigQuery</b>. 
-            Features ML-driven dropout prediction (<i>Random Forest</i>), student clustering (<i>K-means</i>), 
-            and satisfaction analysis (<i>Boosted Trees</i>) with interactive visualizations and CSV export capabilities.
+            A functional MVP of a cloud-native ML platform to predict university dropout risk, 
+            demonstrating data-driven retention strategies.
         </p>
     </div>
     """, unsafe_allow_html=True)
@@ -354,33 +353,15 @@ def render_home_dashboard(tables_info):
     if hasattr(last_update, 'strftime'):
         last_update = last_update.strftime("%d/%m/%Y")
 
-    col1.metric("Dataset Totali", len(tables_info))
-    col2.metric("Record Totali", f"{total_rows:,}")
-    col3.metric("Dimensione Dati", f"{total_size:.1f} MB")
-    col4.metric("Ultimo Aggiornamento", last_update)
+    col1.metric("Total Datasets", len(tables_info))
+    col2.metric("Total Records", f"{total_rows:,}")
+    col3.metric("Data Size", f"{total_size:.1f} MB")
+    col4.metric("Last Update", last_update)
     
     st.markdown("---")
+    st.subheader("📂 Data Catalogue")
     
-    # Grafico riassuntivo dimensioni tabelle
-    st.subheader("� Panoramica Dataset")
-    if tables_info:
-        df_summary = pd.DataFrame(tables_info)
-        fig = px.bar(
-            df_summary, 
-            x='name', 
-            y='rows', 
-            title="Record per Tabella",
-            labels={'name': 'Tabella', 'rows': 'Numero Record'},
-            color='rows',
-            color_continuous_scale='Viridis'
-        )
-        fig = apply_chart_theme(fig)
-        st.plotly_chart(fig, use_container_width=True)
-    
-    st.markdown("---")
-    st.subheader("📂 Catalogo Dati")
-    
-    # Grid layout per le card delle tabelle
+    # Grid layout for table cards
     cols = st.columns(3)
     for idx, t in enumerate(tables_info):
         with cols[idx % 3]:
@@ -390,18 +371,72 @@ def render_home_dashboard(tables_info):
                     <h4 style="margin-top: 0; color: #111827;">📄 {t['name']}</h4>
                     <p style="font-size: 0.9em; color: #6b7280; height: 40px; overflow: hidden; text-overflow: ellipsis;">{t['description']}</p>
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
-                        <span style="background-color: #f3f4f6; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; color: #374151;">{t['rows']:,} righe</span>
+                        <span style="background-color: #f3f4f6; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; color: #374151;">{t['rows']:,} rows</span>
                         <span style="font-size: 0.8em; color: #9ca3af;">{t['size_mb']} MB</span>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
 
 
+def create_specialized_chart(df: pd.DataFrame, table_id: str):
+    """
+    Creates specialized charts for ML tables.
+    """
+    if table_id == "studenti_churn_pred" and 'prob_churn' in df.columns:
+        # Churn Probability Distribution
+        fig = px.histogram(
+            df, 
+            x='prob_churn', 
+            nbins=30,
+            title="Dropout Probability Distribution",
+            labels={'prob_churn': 'Dropout Probability', 'count': 'Number of Students'},
+            color_discrete_sequence=['#4f46e5']
+        )
+        return apply_chart_theme(fig)
+    
+    elif table_id == "feature_importance_studenti":
+        # Feature Importance Horizontal Bar Chart (sorted)
+        importance_cols = [col for col in df.columns if 'importance' in col.lower() or 'peso' in col.lower() or 'percentuale' in col.lower()]
+        feature_col = next((col for col in df.columns if 'feature' in col.lower() or 'caratteristica' in col.lower()), df.columns[0])
+        
+        if importance_cols:
+            df_sorted = df.sort_values(by=importance_cols[0], ascending=True).tail(15)
+            fig = px.bar(
+                df_sorted,
+                y=feature_col,
+                x=importance_cols[0],
+                orientation='h',
+                title="Top 15 Features by Importance",
+                labels={feature_col: 'Feature', importance_cols[0]: 'Importance'},
+                color=importance_cols[0],
+                color_continuous_scale='Viridis'
+            )
+            return apply_chart_theme(fig)
+    
+    elif table_id == "studenti_cluster":
+        # Cluster Analysis: Distribution by Cluster
+        cluster_col = next((col for col in df.columns if 'cluster' in col.lower()), None)
+        if cluster_col:
+            cluster_counts = df[cluster_col].value_counts().reset_index()
+            cluster_counts.columns = ['Cluster', 'Count']
+            fig = px.bar(
+                cluster_counts,
+                x='Cluster',
+                y='Count',
+                title="Student Distribution by Cluster",
+                color='Cluster',
+                color_continuous_scale='Turbo'
+            )
+            return apply_chart_theme(fig)
+    
+    return None
+
+
 def render_table_inspection(df: pd.DataFrame, table_info: dict):
     """
-    Visualizzazione dettagliata di una singola tabella.
+    Detailed visualization of a single table.
     """
-    # Header con metadati
+    # Header with metadata
     col_head_1, col_head_2 = st.columns([3, 1])
     with col_head_1:
         st.title(f"📄 {table_info['name']}")
@@ -415,28 +450,28 @@ def render_table_inspection(df: pd.DataFrame, table_info: dict):
             use_container_width=True
         )
     
-    # Metriche rapide
+    # Quick metrics
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Righe", f"{len(df):,}")
-    m2.metric("Colonne", len(df.columns))
+    m1.metric("Rows", f"{len(df):,}")
+    m2.metric("Columns", len(df.columns))
     missing_pct = round(df.isna().sum().sum() / (len(df) * len(df.columns)) * 100, 2) if not df.empty else 0
     m3.metric("Missing Values", f"{missing_pct}%")
     mem_mb = round(df.memory_usage(deep=True).sum() / (1024 * 1024), 2) if not df.empty else 0
-    m4.metric("Memoria", f"{mem_mb} MB")
+    m4.metric("Memory", f"{mem_mb} MB")
     
     st.markdown("---")
 
     # Tabs
-    tab_data, tab_stats, tab_info = st.tabs(["🔍 Esplora Dati", "📊 Statistiche & Grafici", "ℹ️ Info & Origine"])
+    tab_data, tab_stats, tab_info = st.tabs(["🔍 Explore Data", "📊 Statistics & Charts", "ℹ️ Info & Origin"])
     
     with tab_data:
-        # Filtri rapidi
-        with st.expander("🔎 Filtri Avanzati", expanded=False):
+        # Quick filters
+        with st.expander("🔎 Advanced Filters", expanded=False):
             col_f1, col_f2 = st.columns([1, 2])
             with col_f1:
-                search = st.text_input("Cerca testo", placeholder="Digita per filtrare...")
+                search = st.text_input("Search text", placeholder="Type to filter...")
             with col_f2:
-                cols = st.multiselect("Colonne visibili", df.columns.tolist(), default=df.columns.tolist()[:8])
+                cols = st.multiselect("Visible columns", df.columns.tolist(), default=df.columns.tolist()[:8])
         
         df_view = df.copy()
         if search:
@@ -445,28 +480,35 @@ def render_table_inspection(df: pd.DataFrame, table_info: dict):
         
         if cols:
             st.dataframe(df_view[cols].head(200), use_container_width=True, height=500)
-            st.caption(f"Mostrando {min(200, len(df_view))} di {len(df_view)} righe filtrate.")
+            st.caption(f"Showing {min(200, len(df_view))} of {len(df_view)} filtered rows.")
         else:
-            st.warning("Seleziona almeno una colonna.")
+            st.warning("Select at least one column.")
 
     with tab_stats:
+        # Check for specialized chart
+        specialized_chart = create_specialized_chart(df, table_info["id"])
+        
+        if specialized_chart:
+            st.plotly_chart(specialized_chart, use_container_width=True)
+            st.markdown("---")
+        
         numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
         
         col_viz_1, col_viz_2 = st.columns([1, 3])
         
         with col_viz_1:
-            st.markdown("#### ⚙️ Configurazione")
-            chart_type = st.selectbox("Tipo Grafico", ["Istogramma", "Box Plot", "Scatter", "Bar Chart", "Heatmap"], index=0)
+            st.markdown("#### ⚙️ Configuration")
+            chart_type = st.selectbox("Chart Type", ["Histogram", "Box Plot", "Scatter", "Bar Chart", "Heatmap"], index=0)
             
-            x_axis = st.selectbox("Asse X", df.columns)
-            y_axis = st.selectbox("Asse Y", [None] + numeric_cols) if chart_type != "Heatmap" else None
-            color_dim = st.selectbox("Colore", [None] + df.columns.tolist()) if chart_type != "Heatmap" else None
+            x_axis = st.selectbox("X Axis", df.columns)
+            y_axis = st.selectbox("Y Axis", [None] + numeric_cols) if chart_type != "Heatmap" else None
+            color_dim = st.selectbox("Color", [None] + df.columns.tolist()) if chart_type != "Heatmap" else None
             
         with col_viz_2:
             try:
                 fig = None
-                if chart_type == "Istogramma":
-                    fig = px.histogram(df, x=x_axis, y=y_axis, color=color_dim, title=f"Distribuzione di {x_axis}")
+                if chart_type == "Histogram":
+                    fig = px.histogram(df, x=x_axis, y=y_axis, color=color_dim, title=f"Distribution of {x_axis}")
                 elif chart_type == "Box Plot":
                     fig = px.box(df, x=x_axis, y=y_axis, color=color_dim, title=f"Box Plot {x_axis}")
                 elif chart_type == "Scatter":
@@ -474,58 +516,58 @@ def render_table_inspection(df: pd.DataFrame, table_info: dict):
                 elif chart_type == "Bar Chart":
                     if len(df) > 1000 and y_axis:
                         df_agg = df.groupby(x_axis)[y_axis].mean().reset_index()
-                        fig = px.bar(df_agg, x=x_axis, y=y_axis, color=color_dim if color_dim in df_agg else None, title=f"Media {y_axis} per {x_axis}")
+                        fig = px.bar(df_agg, x=x_axis, y=y_axis, color=color_dim if color_dim in df_agg else None, title=f"Average {y_axis} by {x_axis}")
                     else:
                         fig = px.bar(df, x=x_axis, y=y_axis, color=color_dim, title=f"Bar Chart {x_axis}")
                 elif chart_type == "Heatmap":
                     if len(numeric_cols) > 1:
                         corr = df[numeric_cols].corr()
-                        fig = px.imshow(corr, text_auto=True, title="Matrice di Correlazione", color_continuous_scale="RdBu_r")
+                        fig = px.imshow(corr, text_auto=True, title="Correlation Matrix", color_continuous_scale="RdBu_r")
                     else:
-                        st.info("Servono almeno 2 colonne numeriche per la Heatmap.")
+                        st.info("Need at least 2 numerical columns for Heatmap.")
 
                 if fig:
                     fig = apply_chart_theme(fig)
                     st.plotly_chart(fig, use_container_width=True)
             except Exception as e:
-                st.error(f"Errore nella creazione del grafico: {e}")
+                st.error(f"Error creating chart: {e}")
 
     with tab_info:
-        st.markdown("### 📖 Origine e Descrizione")
-        origin_text = TABLE_ORIGINS.get(table_info["id"], "Nessuna informazione dettagliata disponibile.")
+        st.markdown("### 📖 Origin and Description")
+        origin_text = TABLE_ORIGINS.get(table_info["id"], "No detailed information available.")
         st.markdown(origin_text)
 
-# ─── 7) MAIN APP ──────────────────────────────────────────────────────────────
+# ─── 6) MAIN APP ────────────────────────────────────────────────────────────
 
 def main():
     inject_custom_css()
     
     # Sidebar Navigation
     st.sidebar.title("🎓 Analytics")
-    st.sidebar.caption("v2.0.0 | BigQuery Powered")
+    st.sidebar.caption("v2.0 | BigQuery Powered")
     
-    # Stato connessione (nascosto se OK per pulizia, mostrato solo se errore o su richiesta)
+    # Connection status (hidden if OK for cleanliness, shown only on error or request)
     client = get_bigquery_client()
     if not client:
-        st.error("❌ Errore critico: Impossibile connettersi a BigQuery.")
+        st.error("❌ Critical error: Unable to connect to BigQuery.")
         st.stop()
         
-    # Caricamento metadati (cached)
-    with st.spinner("Caricamento catalogo..."):
+    # Load metadata (cached)
+    with st.spinner("Loading catalogue..."):
         tables_info = get_tables_metadata_cached()
     
     if not tables_info:
-        st.warning("Nessuna tabella trovata.")
+        st.warning("No tables found.")
         st.stop()
         
-    # Menu Navigazione
-    st.sidebar.markdown("### 🧭 Navigazione")
+    # Navigation Menu
+    st.sidebar.markdown("### 🧭 Navigation")
     options = ["🏠 Home Dashboard"] + [f"📄 {t['name']}" for t in tables_info]
     selection = st.sidebar.radio("", options, label_visibility="collapsed")
     
     st.sidebar.markdown("---")
-    with st.sidebar.expander("⚙️ Impostazioni"):
-        if st.button("🔄 Pulisci Cache"):
+    with st.sidebar.expander("⚙️ Settings"):
+        if st.button("🔄 Clear Cache"):
             st.cache_data.clear()
             st.cache_resource.clear()
             st.rerun()
@@ -535,18 +577,18 @@ def main():
     if selection == "🏠 Home Dashboard":
         render_home_dashboard(tables_info)
     else:
-        # Estrai nome tabella
+        # Extract table name
         table_name = selection.split("📄 ")[1]
         current_info = next((t for t in tables_info if t["name"] == table_name), None)
         
         if current_info:
-            with st.spinner(f"Caricamento dati {table_name}..."):
-                df = load_table_data_optimized(table_name)
+            with st.spinner(f"Loading data {table_name}..."):
+                df = load_table_data_optimized(current_info["id"])
                 
             if not df.empty:
                 render_table_inspection(df, current_info)
             else:
-                st.warning(f"La tabella {table_name} è vuota o impossibile da caricare.")
+                st.warning(f"Table {table_name} is empty or unable to load.")
 
 if __name__ == "__main__":
     main()
