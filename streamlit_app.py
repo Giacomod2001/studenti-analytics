@@ -205,17 +205,28 @@ def load_table_data_optimized(table_id: str):
         try:
             df = client.query(query).to_dataframe()
         except Exception as e_fast:
-            logger.warning(f"Fast loading fallito per {table_id}, provo fallback. Errore: {e_fast}")
-            # Fallback: create_bqstorage_client=False per usare REST API standard
-            df = client.query(query).to_dataframe(create_bqstorage_client=False)
-        
+            logger.warning(f"Fast loading fallito per {table_id}: {e_fast}")
+            # Tentativo 2: REST API standard
+            try:
+                df = client.query(query).to_dataframe(create_bqstorage_client=False)
+            except Exception as e_rest:
+                logger.warning(f"REST loading fallito per {table_id}: {e_rest}")
+                # Tentativo 3: Manuale (lento ma sicuro, non richiede db-dtypes)
+                try:
+                    job = client.query(query)
+                    rows = [dict(row) for row in job.result()]
+                    df = pd.DataFrame(rows)
+                except Exception as e_manual:
+                    raise e_manual
+
         # Ottimizzazione tipi per ridurre memoria e migliorare compatibilità Arrow
         # Convertiamo colonne object che sembrano categorie
-        for col in df.select_dtypes(include=['object']).columns:
-            num_unique = df[col].nunique()
-            num_total = len(df)
-            if num_unique / num_total < 0.5: # Euristica
-                df[col] = df[col].astype('category')
+        if not df.empty:
+            for col in df.select_dtypes(include=['object']).columns:
+                num_unique = df[col].nunique()
+                num_total = len(df)
+                if num_total > 0 and num_unique / num_total < 0.5: # Euristica
+                    df[col] = df[col].astype('category')
                 
         return df
     except Exception as e:
