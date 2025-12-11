@@ -24,25 +24,16 @@ logger = logging.getLogger(__name__)
 
 # ─── 2) RENDERING FUNCTIONS ────────────────────────────────────────────────
 
-def render_kpi_card(label, value, icon=""):
-    """Renders a custom HTML KPI card."""
-    st.markdown(f"""
-    <div class="kpi-card">
-        <div class="kpi-label">{icon} {label}</div>
-        <div class="kpi-value">{value}</div>
-    </div>
-    """, unsafe_allow_html=True)
-
 def render_home_dashboard(tables_info):
     """
-    Main dashboard with aggregated KPIs and High-Impact UI.
+    Main dashboard with aggregated KPIs and Standard UI.
     """
-    st.markdown("## 🎓 Student Analytics Dashboard")
+    st.title("🎓 Student Analytics Dashboard")
     st.caption("AI-Powered Dropout Prediction & Retention Intelligence")
     
     st.markdown("---")
     
-    # KPI Section - Using Custom Cards
+    # KPI Section - Standard Streamlit Metrics
     col1, col2, col3, col4 = st.columns(4)
     
     total_rows = sum(t["rows"] for t in tables_info)
@@ -51,37 +42,31 @@ def render_home_dashboard(tables_info):
     if hasattr(last_update, 'strftime'):
         last_update = last_update.strftime("%d/%m")
 
-    with col1: render_kpi_card("Datasets", len(tables_info), "📂")
-    with col2: render_kpi_card("Total Records", f"{total_rows:,}", "👥")
-    with col3: render_kpi_card("Size in Cloud", f"{total_size:.1f} MB", "☁️")
-    with col4: render_kpi_card("Last Update", last_update, "🕒")
+    col1.metric("Datasets", len(tables_info))
+    col2.metric("Total Records", f"{total_rows:,}")
+    col3.metric("Size in Cloud", f"{total_size:.1f} MB")
+    col4.metric("Last Update", last_update)
     
     st.markdown("---")
     
-    st.markdown("### � Data Warehouse Catalogue")
-    st.caption("Select a dataset below to explore insights, visualize trends, and export data.")
+    st.header("📂 Data Warehouse Catalogue")
+    st.info("Select a dataset below to explore insights, visualize trends, and export data.")
     
     # Grid layout for table cards
     cols = st.columns(3)
     for idx, t in enumerate(tables_info):
         with cols[idx % 3]:
-            # Custom Hover Card
+            # Standard Streamlit Container
             origin_badge = "ML Generated" if "pred" in t['id'] or "cluster" in t['id'] else "Raw Data"
-            badge_color = "#ec4899" if "ML" in origin_badge else "#6366f1"
             
-            st.markdown(f"""
-            <div class="premium-card">
-                <div style="display: flex; justify-content: space-between; align-items: start;">
-                    <h4 style="margin: 0; color: #1e293b; font-size: 1.1rem;">📄 {t['name']}</h4>
-                    <span style="background-color: {badge_color}20; color: {badge_color}; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 600;">{origin_badge}</span>
-                </div>
-                <p style="font-size: 0.9em; color: #64748b; margin-top: 10px; height: 45px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">{t['description']}</p>
-                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #f1f5f9; display: flex; justify-content: space-between; font-size: 0.85rem; color: #94a3b8;">
-                    <span>{t['rows']:,} rows</span>
-                    <span>{t['size_mb']} MB</span>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+            with st.container(border=True):
+                st.subheader(f"📄 {t['name']}")
+                st.caption(f"**{origin_badge}**")
+                st.write(t['description'])
+                st.divider()
+                c1, c2 = st.columns(2)
+                c1.caption(f"**Rows:** {t['rows']:,}")
+                c2.caption(f"**Size:** {t['size_mb']} MB")
 
 
 def create_specialized_chart(df: pd.DataFrame, table_id: str):
