@@ -71,77 +71,101 @@ def render_home_dashboard(tables_info):
 
 def create_specialized_chart(df: pd.DataFrame, table_id: str):
     """
-    Creates minimal, clean specialized charts for ML tables.
+    Creates readable, useful visualizations (Lines, Scatter, Heatmaps).
     """
-    # Simple, standard colors
-    NEUTRAL_COLOR = '#6b7280'
-    ACCENT_COLOR = '#3b82f6'
+    # Clean standard colors
+    COLOR_MAIN = '#3b82f6' # Blue
+    COLOR_RISK = '#ef4444' # Red
     
     if table_id == "studenti_churn_pred" and 'prob_churn' in df.columns:
-        # Standard Histogram/Bar
-        fig = go.Figure()
-        hist_data = np.histogram(df['prob_churn'], bins=20)
+        # 1. RISK CURVE (Line Chart)
+        # Sort students by risk to show the "shape" of the problem
+        df_sorted = df.sort_values('prob_churn').reset_index(drop=True)
         
-        fig.add_trace(go.Bar(
-            x=hist_data[1][:-1],
-            y=hist_data[0],
-            marker=dict(color=NEUTRAL_COLOR),
-            name='Students'
+        fig = go.Figure()
+        
+        # Add a line for the risk curve
+        fig.add_trace(go.Scatter(
+            x=df_sorted.index, 
+            y=df_sorted['prob_churn'],
+            mode='lines',
+            fill='tozeroy', # Fill area under curve
+            name='Dropout Prob.',
+            line=dict(color=COLOR_MAIN, width=3)
         ))
         
+        # Add a threshold line (e.g. 0.5)
+        fig.add_hline(y=0.5, line_dash="dash", line_color=COLOR_RISK, annotation_text="Risk Threshold (0.5)")
+        
         fig.update_layout(
-            title="Dropout Probability Distribution",
-            xaxis_title="Dropout Probability",
-            yaxis_title="Number of Students",
-            bargap=0.1
+            title="📉 Student Dropout Risk Curve (Sorted)",
+            xaxis_title="Students (Sorted by Risk)",
+            yaxis_title="Probability (0-1)",
+            hovermode="x unified",
+            showlegend=False
         )
         return styles_config.apply_chart_theme(fig)
     
     elif table_id == "feature_importance_studenti":
-        # Standard Bar Chart
+        # 2. CLEVELAND DOT PLOT (Scatter + Lines) [Assi Cartesiani]
+        # Much cleaner than a bar chart for reading labels
         importance_cols = [col for col in df.columns if 'importance' in col.lower() or 'peso' in col.lower() or 'percentuale' in col.lower()]
         feature_col = next((col for col in df.columns if 'feature' in col.lower() or 'caratteristica' in col.lower()), df.columns[0])
         
         if importance_cols:
-            df_sorted = df.sort_values(by=importance_cols[0], ascending=True).tail(15)
+            df_sorted = df.sort_values(by=importance_cols[0], ascending=True).tail(20) # Top 20
             
             fig = go.Figure()
-            fig.add_trace(go.Bar(
-                y=df_sorted[feature_col],
+            
+            # Draw lines
+            for i in range(len(df_sorted)):
+                fig.add_shape(
+                    type='line',
+                    x0=0, y0=df_sorted.iloc[i][feature_col],
+                    x1=df_sorted.iloc[i][importance_cols[0]], y1=df_sorted.iloc[i][feature_col],
+                    line=dict(color='#e5e7eb', width=2)
+                )
+            
+            # Draw points
+            fig.add_trace(go.Scatter(
                 x=df_sorted[importance_cols[0]],
-                orientation='h',
-                marker=dict(color=ACCENT_COLOR),
+                y=df_sorted[feature_col],
+                mode='markers',
+                marker=dict(color=COLOR_MAIN, size=12, line=dict(color='white', width=2)),
                 name='Importance'
             ))
             
             fig.update_layout(
-                title="Top 15 Features by Importance",
-                xaxis_title="Importance Score",
-                yaxis_title="Feature",
-                height=500
+                title="🎯 Feature Importance (Dot Plot)",
+                xaxis_title="Impact Score",
+                yaxis_title="",
+                height=600,
+                xaxis=dict(showgrid=True),
+                yaxis=dict(showgrid=True, gridcolor='#f3f4f6') # Grid lines helps reading
             )
             return styles_config.apply_chart_theme(fig)
     
     elif table_id == "studenti_cluster":
-        # Standard Bar Chart
+        # 3. TREEMAP (Rectangles)
+        # Better space usage than bars
         cluster_col = next((col for col in df.columns if 'cluster' in col.lower()), None)
         if cluster_col:
-            cluster_counts = df[cluster_col].value_counts().sort_index().reset_index()
+            cluster_counts = df[cluster_col].value_counts().reset_index()
             cluster_counts.columns = ['Cluster', 'Count']
             
-            fig = go.Figure()
-            fig.add_trace(go.Bar(
-                x=cluster_counts['Cluster'].astype(str),
-                y=cluster_counts['Count'],
-                marker=dict(color=NEUTRAL_COLOR),
-                name='Students'
-            ))
+            # Add a parent for the treemap hierarchy
+            cluster_counts['Parent'] = "All Students"
             
-            fig.update_layout(
-                title="Student Distribution by Cluster",
-                xaxis_title="Cluster ID",
-                yaxis_title="Number of Students"
+            fig = px.treemap(
+                cluster_counts, 
+                path=['Parent', 'Cluster'], 
+                values='Count',
+                title="📦 Student Clusters (Treemap)",
+                color='Count',
+                color_continuous_scale='Blues'
             )
+            
+            fig.update_layout(margin=dict(t=50, l=0, r=0, b=0))
             return styles_config.apply_chart_theme(fig)
     
     return None
