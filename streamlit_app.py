@@ -24,91 +24,98 @@ logger = logging.getLogger(__name__)
 
 # ─── 2) RENDERING FUNCTIONS ────────────────────────────────────────────────
 
-def render_home_dashboard(tables_info):
-    """
-    Main dashboard with aggregated KPIs and About section.
-    """
-    st.title("🎓 Student Analytics Dashboard")
-    
-    # About Section
-    st.markdown("""
-    <div style="background-color: #eef2ff; padding: 20px; border-radius: 10px; border-left: 5px solid #4f46e5; margin-bottom: 25px;">
-        <h4 style="color: #4f46e5; margin-top: 0;">ℹ️ About this Platform</h4>
-        <p style="margin-bottom: 0; color: #374151;">
-            A functional MVP of a cloud-native ML platform to predict university dropout risk, 
-            demonstrating data-driven retention strategies.
-        </p>
+def render_kpi_card(label, value, icon=""):
+    """Renders a custom HTML KPI card."""
+    st.markdown(f"""
+    <div class="kpi-card">
+        <div class="kpi-label">{icon} {label}</div>
+        <div class="kpi-value">{value}</div>
     </div>
     """, unsafe_allow_html=True)
+
+def render_home_dashboard(tables_info):
+    """
+    Main dashboard with aggregated KPIs and High-Impact UI.
+    """
+    st.markdown("## 🎓 Student Analytics Dashboard")
+    st.caption("AI-Powered Dropout Prediction & Retention Intelligence")
     
-    # KPI Cards Row
+    st.markdown("---")
+    
+    # KPI Section - Using Custom Cards
     col1, col2, col3, col4 = st.columns(4)
     
     total_rows = sum(t["rows"] for t in tables_info)
     total_size = sum(t["size_mb"] for t in tables_info)
     last_update = max([t["created"] for t in tables_info]) if tables_info else "N/A"
     if hasattr(last_update, 'strftime'):
-        last_update = last_update.strftime("%d/%m/%Y")
+        last_update = last_update.strftime("%d/%m")
 
-    col1.metric("Total Datasets", len(tables_info))
-    col2.metric("Total Records", f"{total_rows:,}")
-    col3.metric("Data Size", f"{total_size:.1f} MB")
-    col4.metric("Last Update", last_update)
+    with col1: render_kpi_card("Datasets", len(tables_info), "📂")
+    with col2: render_kpi_card("Total Records", f"{total_rows:,}", "👥")
+    with col3: render_kpi_card("Size in Cloud", f"{total_size:.1f} MB", "☁️")
+    with col4: render_kpi_card("Last Update", last_update, "🕒")
     
     st.markdown("---")
-    st.subheader("📂 Data Catalogue")
+    
+    st.markdown("### � Data Warehouse Catalogue")
+    st.caption("Select a dataset below to explore insights, visualize trends, and export data.")
     
     # Grid layout for table cards
     cols = st.columns(3)
     for idx, t in enumerate(tables_info):
         with cols[idx % 3]:
-            with st.container():
-                st.markdown(f"""
-                <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px; height: 100%; background-color: white;">
-                    <h4 style="margin-top: 0; color: #111827;">📄 {t['name']}</h4>
-                    <p style="font-size: 0.9em; color: #6b7280; height: 40px; overflow: hidden; text-overflow: ellipsis;">{t['description']}</p>
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
-                        <span style="background-color: #f3f4f6; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; color: #374151;">{t['rows']:,} rows</span>
-                        <span style="font-size: 0.8em; color: #9ca3af;">{t['size_mb']} MB</span>
-                    </div>
+            # Custom Hover Card
+            origin_badge = "ML Generated" if "pred" in t['id'] or "cluster" in t['id'] else "Raw Data"
+            badge_color = "#ec4899" if "ML" in origin_badge else "#6366f1"
+            
+            st.markdown(f"""
+            <div class="premium-card">
+                <div style="display: flex; justify-content: space-between; align-items: start;">
+                    <h4 style="margin: 0; color: #1e293b; font-size: 1.1rem;">📄 {t['name']}</h4>
+                    <span style="background-color: {badge_color}20; color: {badge_color}; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 600;">{origin_badge}</span>
                 </div>
-                """, unsafe_allow_html=True)
+                <p style="font-size: 0.9em; color: #64748b; margin-top: 10px; height: 45px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">{t['description']}</p>
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #f1f5f9; display: flex; justify-content: space-between; font-size: 0.85rem; color: #94a3b8;">
+                    <span>{t['rows']:,} rows</span>
+                    <span>{t['size_mb']} MB</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
 
 def create_specialized_chart(df: pd.DataFrame, table_id: str):
     """
-    Creates minimal, clean specialized charts for ML tables.
+    Creates specialized charts with Premium Styles.
     """
-    NEUTRAL_COLOR = '#6b7280'  # Neutral gray
-    ACCENT_COLOR = '#3b82f6'   # Clean blue
+    colors = styles_config.COLORS
     
     if table_id == "studenti_churn_pred" and 'prob_churn' in df.columns:
-        # Clean bar chart instead of filled histogram
+        # Gradient Bar Chart
         fig = go.Figure()
-        
-        # Create bins
         hist_data = np.histogram(df['prob_churn'], bins=20)
+        
+        # Color gradient based on risk
+        bar_colors = [colors['success'] if x < 0.3 else colors['warning'] if x < 0.7 else colors['danger'] for x in hist_data[1][:-1]]
         
         fig.add_trace(go.Bar(
             x=hist_data[1][:-1],
             y=hist_data[0],
-            marker=dict(
-                color=NEUTRAL_COLOR,
-                line=dict(color='white', width=2)
-            ),
-            name='Students'
+            marker=dict(color=bar_colors, line=dict(width=0)),
+            name='Students',
+            opacity=0.9
         ))
         
         fig.update_layout(
-            title="Dropout Probability Distribution",
-            xaxis_title="Dropout Probability",
-            yaxis_title="Number of Students",
-            bargap=0.1
+            title="🔮 Dropout Probability Distribution",
+            xaxis_title="Predicted Prob (0=Safe, 1=Risk)",
+            yaxis_title="Count of Students",
+            bargap=0.05
         )
         return styles_config.apply_chart_theme(fig)
     
     elif table_id == "feature_importance_studenti":
-        # Clean horizontal bar chart with single color
+        # Lollipop Chart for aesthetics
         importance_cols = [col for col in df.columns if 'importance' in col.lower() or 'peso' in col.lower() or 'percentuale' in col.lower()]
         feature_col = next((col for col in df.columns if 'feature' in col.lower() or 'caratteristica' in col.lower()), df.columns[0])
         
@@ -116,48 +123,47 @@ def create_specialized_chart(df: pd.DataFrame, table_id: str):
             df_sorted = df.sort_values(by=importance_cols[0], ascending=True).tail(15)
             
             fig = go.Figure()
-            fig.add_trace(go.Bar(
-                y=df_sorted[feature_col],
+            # The stems
+            fig.add_trace(go.Scatter(
                 x=df_sorted[importance_cols[0]],
-                orientation='h',
-                marker=dict(
-                    color=ACCENT_COLOR,
-                    line=dict(color='white', width=1)
-                ),
+                y=df_sorted[feature_col],
+                mode='markers',
+                marker=dict(color=colors['primary'], size=12),
                 name='Importance'
             ))
+            # The bars (thin lines)
+            for i in range(len(df_sorted)):
+                fig.add_shape(
+                    type='line',
+                    x0=0, y0=df_sorted.iloc[i][feature_col],
+                    x1=df_sorted.iloc[i][importance_cols[0]], y1=df_sorted.iloc[i][feature_col],
+                    line=dict(color=colors['neutral'], width=3)
+                )
             
             fig.update_layout(
-                title="Top 15 Features by Importance",
-                xaxis_title="Importance Score",
-                yaxis_title="Feature",
-                height=500
+                title="🧠 Top Drivers of Churn (Random Forest)",
+                xaxis_title="Importance Impact",
+                yaxis_title="",
+                height=600
             )
             return styles_config.apply_chart_theme(fig)
     
     elif table_id == "studenti_cluster":
-        # Simple bar chart with neutral colors
+        # Colorful Donut Chart
         cluster_col = next((col for col in df.columns if 'cluster' in col.lower()), None)
         if cluster_col:
-            cluster_counts = df[cluster_col].value_counts().sort_index().reset_index()
+            cluster_counts = df[cluster_col].value_counts().reset_index()
             cluster_counts.columns = ['Cluster', 'Count']
             
-            fig = go.Figure()
-            fig.add_trace(go.Bar(
-                x=cluster_counts['Cluster'].astype(str),
-                y=cluster_counts['Count'],
-                marker=dict(
-                    color=NEUTRAL_COLOR,
-                    line=dict(color='white', width=2)
-                ),
-                name='Students'
-            ))
-            
-            fig.update_layout(
-                title="Student Distribution by Cluster",
-                xaxis_title="Cluster ID",
-                yaxis_title="Number of Students"
+            fig = px.pie(
+                cluster_counts, 
+                values='Count', 
+                names='Cluster',
+                title="👥 Student Segmentation Groups",
+                hole=0.6,
+                color_discrete_sequence=[colors['primary'], colors['secondary'], colors['accent'], colors['warning']]
             )
+            fig.update_traces(textinfo='percent+label')
             return styles_config.apply_chart_theme(fig)
     
     return None
