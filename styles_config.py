@@ -1,105 +1,174 @@
 import streamlit as st
 import plotly.graph_objects as go
+import plotly.express as px
+
+# ─── COLOR PALETTES ──────────────────────────────────────────────────────────
+# Premium, high-contrast palette for charts
+COLORS = {
+    "primary": "#6366f1",      # Indigo 500
+    "secondary": "#ec4899",    # Pink 500
+    "accent": "#8b5cf6",       # Violet 500
+    "neutral": "#cbd5e1",      # Slate 300
+    "background": "#ffffff",
+    "text": "#1e293b",
+    "success": "#10b981",
+    "warning": "#f59e0b",
+    "danger": "#ef4444",
+}
 
 def inject_custom_css():
-    """Injects global CSS for the application."""
+    """Injects premium CSS with animations, glassmorphism, and better cards."""
     st.markdown("""
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
 
+        /* GLOBAL TYPOGRAPHY */
         html, body, [class*="css"]  {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Outfit', sans-serif;
+            color: #1e293b;
         }
-
+        
+        /* APP BACKGROUND */
         .stApp {
-            background-color: #f8f9fa;
+            background-color: #f8fafc;
+            background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+            background-size: 20px 20px;
         }
         
-        [data-testid="stMetric"] {
-            background-color: #ffffff;
-            padding: 15px;
-            border-radius: 10px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            border: 1px solid #e9ecef;
-        }
-        
-        @media (prefers-color-scheme: dark) {
-            [data-testid="stMetric"] {
-                background-color: #262730;
-                border: 1px solid #363940;
-                box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-            }
-            .stApp {
-                background-color: #0e1117;
-            }
-        }
-
+        /* SIDEBAR STYLING */
         [data-testid="stSidebar"] {
-            background-color: #f0f2f6;
-            border-right: 1px solid #e9ecef;
+            background-color: #ffffff;
+            border-right: 1px solid #e2e8f0;
+            box-shadow: 4px 0 24px rgba(0,0,0,0.02);
         }
-        @media (prefers-color-scheme: dark) {
-            [data-testid="stSidebar"] {
-                background-color: #1a1c24;
-                border-right: 1px solid #363940;
-            }
+        
+        /* CARD COMPONENT CLASS (Used in HTML) */
+        .premium-card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid #f1f5f9;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.01), 0 2px 4px -1px rgba(0, 0, 0, 0.01);
+            transition: all 0.3s ease;
         }
-
+        .premium-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);
+            border-color: #6366f1;
+        }
+        
+        /* KPI METRIC CARDS */
+        .kpi-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+        .kpi-card:hover {
+            border-color: #6366f1;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1);
+        }
+        .kpi-value {
+            font-size: 28px;
+            font-weight: 700;
+            background: -webkit-linear-gradient(45deg, #4f46e5, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .kpi-label {
+            font-size: 14px;
+            color: #64748b;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        /* HEADERS */
         h1, h2, h3 {
             font-weight: 700;
-            letter-spacing: -0.5px;
+            letter-spacing: -0.02em;
         }
         
-        .block-container {
-            padding-top: 2rem;
+        /* TABS */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 8px;
+            background-color: transparent;
+        }
+        .stTabs [data-baseweb="tab"] {
+            height: 40px;
+            border-radius: 8px;
+            background-color: white;
+            border: 1px solid #e2e8f0;
+            padding: 0 20px;
+            font-weight: 500;
+        }
+        .stTabs [aria-selected="true"] {
+            background-color: #6366f1 !important;
+            color: white !important;
+            border: none;
         }
         
+        /* SPINNERS */
         .stSpinner > div {
-            border-top-color: #4F46E5 !important;
+            border-top-color: #6366f1 !important;
+        }
+        
+        /* BUTTONS */
+        .stButton button {
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .stButton button:hover {
+            transform: scale(1.02);
         }
     </style>
     """, unsafe_allow_html=True)
 
 def apply_chart_theme(fig):
     """
-    Applies a minimal, clean theme to Plotly charts.
-    Focus on readability with minimal colors.
+    Applies a premium, modern theme to Plotly charts.
     """
     fig.update_layout(
-        template="simple_white",
-        font=dict(family="Inter, sans-serif", size=11, color="#1f2937"),
-        title_font=dict(family="Inter, sans-serif", size=16, color="#111827"),
-        paper_bgcolor="white",
-        plot_bgcolor="white",
-        margin=dict(l=40, r=40, t=60, b=40),
+        template="plotly_white",
+        font=dict(family="Outfit, sans-serif", size=12, color=COLORS["text"]),
+        title_font=dict(family="Outfit, sans-serif", size=18, color=COLORS["text"], weight=700),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        margin=dict(l=20, r=20, t=50, b=20),
         hoverlabel=dict(
             bgcolor="white",
-            font_size=11,
-            font_family="Inter, sans-serif",
-            bordercolor="#e5e7eb"
+            font_size=12,
+            font_family="Outfit, sans-serif",
+            bordercolor=COLORS["neutral"],
+            font_color=COLORS["text"]
         ),
         showlegend=True,
         legend=dict(
-            bgcolor="white",
-            bordercolor="#e5e7eb",
-            borderwidth=1
+            bgcolor="rgba(255,255,255,0.8)",
+            bordercolor=COLORS["neutral"],
+            borderwidth=0,
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        ),
+        # Clean Grid
+        xaxis=dict(
+            showgrid=True,
+            gridcolor="#f1f5f9",
+            linecolor="#cbd5e1",
+            zeroline=False
+        ),
+        yaxis=dict(
+            showgrid=True,
+            gridcolor="#f1f5f9",
+            linecolor="#cbd5e1",
+            zeroline=False
         )
-    )
-    # Minimal grid lines
-    fig.update_xaxes(
-        showgrid=True, 
-        gridwidth=1, 
-        gridcolor='#f3f4f6',
-        showline=True,
-        linewidth=1,
-        linecolor='#d1d5db'
-    )
-    fig.update_yaxes(
-        showgrid=True, 
-        gridwidth=1, 
-        gridcolor='#f3f4f6',
-        showline=True,
-        linewidth=1,
-        linecolor='#d1d5db'
     )
     return fig
