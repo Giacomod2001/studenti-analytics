@@ -71,36 +71,34 @@ def render_home_dashboard(tables_info):
 
 def create_specialized_chart(df: pd.DataFrame, table_id: str):
     """
-    Creates specialized charts with Premium Styles.
+    Creates minimal, clean specialized charts for ML tables.
     """
-    colors = styles_config.COLORS
+    # Simple, standard colors
+    NEUTRAL_COLOR = '#6b7280'
+    ACCENT_COLOR = '#3b82f6'
     
     if table_id == "studenti_churn_pred" and 'prob_churn' in df.columns:
-        # Gradient Bar Chart
+        # Standard Histogram/Bar
         fig = go.Figure()
         hist_data = np.histogram(df['prob_churn'], bins=20)
-        
-        # Color gradient based on risk
-        bar_colors = [colors['success'] if x < 0.3 else colors['warning'] if x < 0.7 else colors['danger'] for x in hist_data[1][:-1]]
         
         fig.add_trace(go.Bar(
             x=hist_data[1][:-1],
             y=hist_data[0],
-            marker=dict(color=bar_colors, line=dict(width=0)),
-            name='Students',
-            opacity=0.9
+            marker=dict(color=NEUTRAL_COLOR),
+            name='Students'
         ))
         
         fig.update_layout(
-            title="🔮 Dropout Probability Distribution",
-            xaxis_title="Predicted Prob (0=Safe, 1=Risk)",
-            yaxis_title="Count of Students",
-            bargap=0.05
+            title="Dropout Probability Distribution",
+            xaxis_title="Dropout Probability",
+            yaxis_title="Number of Students",
+            bargap=0.1
         )
         return styles_config.apply_chart_theme(fig)
     
     elif table_id == "feature_importance_studenti":
-        # Lollipop Chart for aesthetics
+        # Standard Bar Chart
         importance_cols = [col for col in df.columns if 'importance' in col.lower() or 'peso' in col.lower() or 'percentuale' in col.lower()]
         feature_col = next((col for col in df.columns if 'feature' in col.lower() or 'caratteristica' in col.lower()), df.columns[0])
         
@@ -108,47 +106,42 @@ def create_specialized_chart(df: pd.DataFrame, table_id: str):
             df_sorted = df.sort_values(by=importance_cols[0], ascending=True).tail(15)
             
             fig = go.Figure()
-            # The stems
-            fig.add_trace(go.Scatter(
-                x=df_sorted[importance_cols[0]],
+            fig.add_trace(go.Bar(
                 y=df_sorted[feature_col],
-                mode='markers',
-                marker=dict(color=colors['primary'], size=12),
+                x=df_sorted[importance_cols[0]],
+                orientation='h',
+                marker=dict(color=ACCENT_COLOR),
                 name='Importance'
             ))
-            # The bars (thin lines)
-            for i in range(len(df_sorted)):
-                fig.add_shape(
-                    type='line',
-                    x0=0, y0=df_sorted.iloc[i][feature_col],
-                    x1=df_sorted.iloc[i][importance_cols[0]], y1=df_sorted.iloc[i][feature_col],
-                    line=dict(color=colors['neutral'], width=3)
-                )
             
             fig.update_layout(
-                title="🧠 Top Drivers of Churn (Random Forest)",
-                xaxis_title="Importance Impact",
-                yaxis_title="",
-                height=600
+                title="Top 15 Features by Importance",
+                xaxis_title="Importance Score",
+                yaxis_title="Feature",
+                height=500
             )
             return styles_config.apply_chart_theme(fig)
     
     elif table_id == "studenti_cluster":
-        # Colorful Donut Chart
+        # Standard Bar Chart
         cluster_col = next((col for col in df.columns if 'cluster' in col.lower()), None)
         if cluster_col:
-            cluster_counts = df[cluster_col].value_counts().reset_index()
+            cluster_counts = df[cluster_col].value_counts().sort_index().reset_index()
             cluster_counts.columns = ['Cluster', 'Count']
             
-            fig = px.pie(
-                cluster_counts, 
-                values='Count', 
-                names='Cluster',
-                title="👥 Student Segmentation Groups",
-                hole=0.6,
-                color_discrete_sequence=[colors['primary'], colors['secondary'], colors['accent'], colors['warning']]
+            fig = go.Figure()
+            fig.add_trace(go.Bar(
+                x=cluster_counts['Cluster'].astype(str),
+                y=cluster_counts['Count'],
+                marker=dict(color=NEUTRAL_COLOR),
+                name='Students'
+            ))
+            
+            fig.update_layout(
+                title="Student Distribution by Cluster",
+                xaxis_title="Cluster ID",
+                yaxis_title="Number of Students"
             )
-            fig.update_traces(textinfo='percent+label')
             return styles_config.apply_chart_theme(fig)
     
     return None
