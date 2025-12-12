@@ -74,9 +74,15 @@ def render_dropout_dashboard(df: pd.DataFrame):
     Dedicated Dashboard for Dropout Prediction.
     Focus: Actionable Intelligence, Lists of At-Risk Students.
     """
-    if 'prob_churn' not in df.columns:
-        st.error("Missing 'prob_churn' column.")
+    # Fuzzy column detection
+    risk_col = next((c for c in df.columns if 'prob' in c.lower() or 'score' in c.lower() or 'pred' in c.lower()), None)
+    
+    if not risk_col:
+        st.error(f"⚠️ Could not find a risk probability column. Available columns: {df.columns.tolist()}")
         return
+    else:
+        # Standardize for the function
+        df['prob_churn'] = df[risk_col]
 
     # 1. TOP METRICS
     avg_churn = df['prob_churn'].mean()
