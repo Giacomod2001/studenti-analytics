@@ -69,6 +69,74 @@ def render_home_dashboard(tables_info):
                 c2.caption(f"**Size:** {t['size_mb']} MB")
 
 
+def render_dropout_dashboard(df: pd.DataFrame):
+    """
+    Dedicated Dashboard for Dropout Prediction.
+    Focus: Actionable Intelligence, Lists of At-Risk Students.
+    """
+    if 'prob_churn' not in df.columns:
+        st.error("Missing 'prob_churn' column.")
+        return
+
+    # 1. TOP METRICS
+    avg_churn = df['prob_churn'].mean()
+    high_risk_df = df[df['prob_churn'] > 0.7].copy()
+    high_risk_count = len(high_risk_df)
+    
+    st.markdown("### 🚨 Dropout Risk Monitor")
+    
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Average Risk Score", f"{avg_churn:.1%}", delta_color="inverse")
+    col2.metric("High Risk Students (>70%)", f"{high_risk_count}", f"{(high_risk_count/len(df)):.1%} of total", delta_color="inverse")
+    col3.metric("Safe Students (<30%)", f"{len(df[df['prob_churn'] < 0.3])}", delta="Stable")
+    
+    st.markdown("---")
+    
+    # 2. ACTION LIST (The "Insight al volo")
+    st.subheader("📋 Priority Action List")
+    st.caption("Students with the highest probability of dropping out. Focus your retention efforts here.")
+    
+    # Sort by risk descending
+    display_cols = [c for c in df.columns if c in ['student_id', 'nome', 'cognome', 'email', 'prob_churn', 'classe']]
+    if not display_cols: display_cols = df.columns.tolist()
+    
+    # Format the risk column for better readability
+    high_risk_df = high_risk_df.sort_values("prob_churn", ascending=False)
+    
+    # We create a style wrapper
+    st.dataframe(
+        high_risk_df[display_cols].head(50),
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "prob_churn": st.column_config.ProgressColumn(
+                "Risk Probability",
+                help="Probability of student dropping out",
+                format="%.2f",
+                min_value=0,
+                max_value=1,
+            ),
+        }
+    )
+    
+    # 3. FAST DISTRIBUTION INSIGHT
+    st.markdown("### 📊 Portfolio Risk Overview")
+    c1, c2 = st.columns([2, 1])
+    with c1:
+        # Simple breakdown
+        risk_bins = pd.cut(df['prob_churn'], bins=[0, 0.3, 0.7, 1.0], labels=["Low Risk", "Medium Risk", "High Risk"])
+        risk_counts = risk_bins.value_counts().sort_index()
+        
+        st.bar_chart(risk_counts, color=["#10b981", "#f59e0b", "#ef4444"])
+    
+    with c2:
+        st.info("""
+        **Strategy:**
+        - **Red (High):** Call immediately.
+        - **Yellow (Medium):** Schedule academic review.
+        - **Green (Low):** Automated check-ins.
+        """)
+
 def render_key_insights(df: pd.DataFrame, table_id: str):
     """
     Renders text-based insights instead of charts.
@@ -143,6 +211,12 @@ def render_table_inspection(df: pd.DataFrame, table_info: dict):
     m4.metric("Memory", f"{mem_mb} MB")
     
     st.markdown("---")
+
+    # Tabs
+    # For Churn Prediction, we want a special dashboard, not the generic tabs
+    if table_info["id"] == "studenti_churn_pred":
+        render_dropout_dashboard(df)
+        return
 
     # Tabs
     tab_data, tab_stats, tab_info = st.tabs(["🔍 Explore Data", "📊 Statistics & Charts", "ℹ️ Info & Origin"])
