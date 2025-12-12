@@ -224,12 +224,9 @@ def render_table_inspection(df: pd.DataFrame, table_info: dict):
             st.warning("Select at least one column.")
 
     with tab_stats:
-        # Check for specialized chart
-        specialized_chart = create_specialized_chart(df, table_info["id"])
-        
-        if specialized_chart:
-            st.plotly_chart(specialized_chart, use_container_width=True)
-            st.markdown("---")
+        # Render Text Insights
+        render_key_insights(df, table_info["id"])
+        st.markdown("---")
         
         numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
         
