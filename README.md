@@ -106,6 +106,7 @@ This project is licensed under the Apache License 2.0 - see the `LICENSE` file f
 
 ## Acknowledgments
 
-The authors would like to acknowledge the assistance of the AI tool Claude (Anthropic) for coding suggestions and debugging support during the development phase. 
+The authors would like to acknowledge the assistance of the AI tool Gemini 3 Pro High and the agentic system Antigravity for coding suggestions and debugging support during the development phase. 
 
 All final implementations, testing, and documentation were carried out independently by the project team.
+project team.
