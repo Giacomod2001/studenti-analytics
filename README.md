@@ -1,211 +1,111 @@
 # Student Analytics Dashboard
 
-## Abstract
+> **Data-Driven Retention Strategies for Higher Education**
 
-This repository presents a functional Minimum Viable Product (MVP) of a cloud-native machine learning platform designed to predict university dropout risk and demonstrate data-driven retention strategies. The platform leverages Google BigQuery for scalable data warehousing and Streamlit for interactive data visualization.
+**Student Analytics Dashboard** is a comprehensive, cloud-native Machine Learning platform designed to predict university dropout risk and analyze student satisfaction. Built on **Google BigQuery** and **Streamlit**, it provides actionable insights into student behavior, enabling proactive retention interventions.
 
-## Overview
-
-The Student Analytics Dashboard is an enterprise-grade analytics solution that integrates multiple machine learning models to provide actionable insights into student performance, behavior, and retention risk. The platform processes institutional data through a robust ETL pipeline and presents results via an intuitive web interface.
-
-### Core Capabilities
-
-The system implements three primary analytical frameworks:
-
-1. **Dropout Risk Prediction**: Utilizes Random Forest classification to identify students at risk of withdrawal, enabling proactive intervention strategies.
-
-2. **Behavioral Segmentation**: Employs K-means clustering (K=4) to categorize students into distinct behavioral profiles for targeted support programs.
-
-3. **Satisfaction Forecasting**: Implements Boosted Tree regression (XGBoost) to model and predict student satisfaction metrics from survey data.
-
-## Technical Architecture
-
-### Technology Stack
-
-- **Frontend**: Streamlit 1.x
-- **Data Warehouse**: Google BigQuery
-- **Visualization**: Plotly 5.x
-- **Data Processing**: Pandas, NumPy
-- **Authentication**: Google Cloud Service Account
-- **ML Framework**: Scikit-learn, XGBoost (upstream models)
-
-### System Requirements
-
-- Python 3.8 or higher
-- Google Cloud Platform account with BigQuery API enabled
-- Service account credentials with appropriate IAM permissions
-- Minimum 4GB RAM recommended for local execution
-
-## Installation
-
-### 1. Repository Setup
-
-```bash
-git clone https://github.com/YOUR_USERNAME/studenti-analytics.git
-cd studenti-analytics
-```
-
-### 2. Dependency Installation
-
-```bash
-pip install -r requirements.txt
-```
-
-### 3. Authentication Configuration
-
-Create a `.streamlit/secrets.toml` file in the project root with the following structure:
-
-```toml
-type = "service_account"
-project_id = "your-project-id"
-private_key_id = "your-private-key-id"
-private_key = "-----BEGIN PRIVATE KEY-----\nYOUR_PRIVATE_KEY\n-----END PRIVATE KEY-----\n"
-client_email = "your-service-account@your-project.iam.gserviceaccount.com"
-client_id = "your-client-id"
-auth_uri = "https://accounts.google.com/o/oauth2/auth"
-token_uri = "https://oauth2.googleapis.com/token"
-auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs"
-client_x509_cert_url = "https://www.googleapis.com/robot/v1/metadata/x509/your-service-account%40your-project.iam.gserviceaccount.com"
-universe_domain = "googleapis.com"
-```
-
-**Security Notice**: Ensure `secrets.toml` is added to `.gitignore` to prevent credential exposure.
-
-## Data Schema
-
-The platform expects the following BigQuery tables within the configured dataset:
-
-| Table Identifier | Description | Primary Use |
-|------------------|-------------|-------------|
-| `studenti` | Student demographic and academic performance records | Base analytics |
-| `studenti_churn_pred` | Dropout probability predictions (0-1 scale) | Risk assessment |
-| `studenti_cluster` | K-means cluster assignments | Segmentation analysis |
-| `feature_importance_studenti` | Model feature importance rankings | Model interpretability |
-| `studenti_soddisfazione_btr` | Satisfaction score predictions | Student experience metrics |
-| `student_churn_rf` | Random Forest model metadata and performance metrics | Model monitoring |
-| `student_kmeans` | K-means centroids and inertia values | Clustering validation |
-| `report_finale_soddisfazione_studenti` | Aggregated satisfaction analysis | Executive reporting |
-
-## Machine Learning Models
-
-### Dropout Prediction Model
-
-**Algorithm**: Random Forest Classifier  
-**Objective**: Binary classification of student dropout risk  
-**Input Features**: Academic performance, attendance patterns, engagement metrics  
-**Output**: Probability score [0,1] indicating dropout likelihood  
-**Performance Metrics**: Accuracy, Precision, Recall, F1-Score (stored in `student_churn_rf`)
-
-### Student Clustering Model
-
-**Algorithm**: K-means Clustering  
-**Number of Clusters**: 4  
-**Objective**: Behavioral segmentation for targeted interventions  
-**Features**: Study hours, academic performance, absence frequency  
-**Preprocessing**: Z-score normalization  
-**Validation**: Elbow method, silhouette analysis
-
-### Satisfaction Prediction Model
-
-**Algorithm**: Gradient Boosted Trees (XGBoost)  
-**Objective**: Regression for satisfaction score prediction  
-**Input**: Survey responses (Likert scale 1-5), demographic data  
-**Output**: Continuous satisfaction score  
-**Performance Metrics**: R², RMSE, MAE
-
-## Usage
-
-### Application Launch
-
-Execute the following command from the project root:
-
-```bash
-streamlit run app.py
-```
-
-The dashboard will be accessible at `http://localhost:8501`
-
-### Navigation
-
-- **Home Dashboard**: Executive summary with KPI metrics and data catalogue
-- **Dataset Views**: Detailed exploration of individual tables with filtering and export capabilities
-- **Specialized Visualizations**: Auto-generated charts tailored to each dataset type
-
-## Features
-
-### Data Management
-- Three-tier data loading strategy with automatic fallback mechanisms
-- Intelligent caching system (TTL: 10 minutes)
-- Type optimization for memory efficiency
-- Support for datasets exceeding 1M rows
-
-### Visualization
-- Specialized charts for ML model outputs (dropout distribution, feature importance, cluster analysis)
-- Interactive Plotly-based visualizations with custom theming
-- Correlation matrices and distribution analysis
-- CSV export functionality for all datasets
-
-### User Interface
-- Responsive layout optimized for desktop environments
-- Collapsible sidebar navigation
-- Advanced filtering with multi-column search
-- Premium design system with Inter font family
-
-## Performance Optimization
-
-The application implements several performance enhancements:
-
-1. **Multi-tier Data Loading**: BQ Storage API → REST API → Manual iteration fallback
-2. **Streamlit Caching**: `@st.cache_data` for query results, `@st.cache_resource` for client connections
-3. **Type Optimization**: Automatic categorical encoding for low-cardinality columns
-4. **Query Optimization**: Selective column loading and row limiting where applicable
-
-## Security Considerations
-
-- Service account credentials should be stored securely using environment-specific secret management
-- Implement authentication middleware for production deployments
-- Enable BigQuery audit logging for compliance requirements
-- Use least-privilege IAM roles for service accounts
-- Rotate service account keys regularly according to organizational policy
-
-## Deployment
-
-For production deployment, consider:
-
-1. **Containerization**: Use Docker for consistent environment management
-2. **Cloud Hosting**: Deploy to Google Cloud Run, AWS App Runner, or Azure Container Instances
-3. **Authentication**: Implement OAuth 2.0 or SAML-based SSO
-4. **Monitoring**: Integrate with application performance monitoring (APM) tools
-5. **Scalability**: Configure horizontal scaling based on concurrent user load
-
-## License
-
-This project is distributed under the MIT License. See `LICENSE` file for complete terms.
-
-## Contributing
-
-Contributions are evaluated based on:
-- Code quality and adherence to PEP 8 standards
-- Comprehensive unit test coverage
-- Documentation completeness
-- Backward compatibility maintenance
-
-Please submit contributions via pull request with detailed descriptions of changes.
-
-## Acknowledgments
-
-Built using open-source technologies: Streamlit, Plotly, Pandas, Google Cloud BigQuery API.
-
-## Support
-
-For technical issues or feature requests, please submit a GitHub issue with:
-- Detailed problem description
-- Steps to reproduce (if applicable)
-- Environment details (Python version, OS)
-- Relevant log outputs
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://progettodatamining.streamlit.app/#student-analytics)
+**[Live Demo](https://progettodatamining.streamlit.app/#student-analytics)**
 
 ---
 
-**Version**: 2.0.0  
-**Last Updated**: 2025-11-29  
-**Maintainer**: Giacomo Dellacqua
+## Features
+
+### Dropout Prediction (Churn)
+- **Random Forest Model**: Predicts the probability of student dropout with high accuracy.
+- **Risk Scoring**: Validates churn risk for every student, allowing targeted counseling.
+- **Explainable AI**: Visualizes Feature Importance to understand *why* a student is at risk (e.g., low attendance, failing grades).
+
+### Behavioral Segmentation
+- **K-Means Clustering**: Unsupervised learning groups students into distinct personas (e.g., "High Achievers", "Struggling", "Disengaged").
+- **Tailored Strategies**: Enables the university to design specific support programs for each cluster.
+
+### Satisfaction Analysis
+- **Boosted Tree Regression**: Analyzes survey data to correlate satisfaction with academic performance and event participation.
+- **Automated Reporting**: Generates comprehensive PDF/HTML reports for administrative review.
+
+### Cloud-Native Architecture
+- **BigQuery Integration**: Direct, optimized connection to enterprise-grade data warehouse.
+- **Real-Time Caching**: Implements intelligent caching strategies (`ttl`, `cache_data`, `cache_resource`) for sub-second dashboard performance.
+
+---
+
+## Technical Stack
+
+The application is engineered using a robust modern stack:
+
+![Python](https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)
+![Google Cloud](https://img.shields.io/badge/Google_Cloud-4285F4?style=for-the-badge&logo=google-cloud&logoColor=white)
+![BigQuery](https://img.shields.io/badge/BigQuery-669DF6?style=for-the-badge&logo=google-cloud&logoColor=white)
+![Scikit-Learn](https://img.shields.io/badge/scikit--learn-F7931E?style=for-the-badge&logo=scikit-learn&logoColor=white)
+![Pandas](https://img.shields.io/badge/Pandas-150458?style=for-the-badge&logo=pandas&logoColor=white)
+![Plotly](https://img.shields.io/badge/Plotly-3F4F75?style=for-the-badge&logo=plotly&logoColor=white)
+
+---
+
+## Installation and Setup
+
+### Prerequisites
+- Python 3.8+
+- Google Cloud Service Account Credentials (JSON)
+
+### Step-by-Step Guide
+
+1. **Clone the Repository**
+   ```bash
+   git clone https://github.com/your-username/student-analytics.git
+   cd student-analytics
+   ```
+
+2. **Install Dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Configure Secrets**
+   Create a `.streamlit/secrets.toml` file with your BigQuery credentials:
+   ```toml
+   [gcp_service_account]
+   type = "service_account"
+   project_id = "your-project-id"
+   private_key_id = "..."
+   private_key = "..."
+   client_email = "..."
+   ```
+
+4. **Launch the Application**
+   ```bash
+   streamlit run streamlit_app.py
+   ```
+
+---
+
+## Usage Manual
+
+1. **Home Dashboard**:
+   - View high-level KPIs: Total students, dataset size, last update time.
+   - Access the **Data Catalogue** for an overview of all available tables.
+
+2. **Data Inspection**:
+   - Navigate to specific tables (e.g., *Dropout Prediction*) via the Sidebar.
+   - Use **Advanced Filters** to search and segment data.
+   - Visualize distributions using interactive Plotly charts.
+   - Access the **Risk Monitor** for dropout prediction actionable insights.
+
+3. **Export**:
+   - Download processed datasets as CSV for offline analysis.
+
+---
+
+## License
+
+This project is licensed under the Apache License 2.0 - see the `LICENSE` file for details.
+
+---
+
+## Acknowledgments
+
+The authors would like to acknowledge the assistance of the AI tool Claude (Anthropic) for coding suggestions and debugging support during the development phase. 
+
+All final implementations, testing, and documentation were carried out independently by the project team.
