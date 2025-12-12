@@ -74,25 +74,58 @@ def render_dropout_dashboard(df: pd.DataFrame):
     Dedicated Dashboard for Dropout Prediction.
     Focus: Actionable Intelligence, Lists of At-Risk Students.
     """
-    # Fuzzy column detection
-    risk_col = next((c for c in df.columns if 'prob' in c.lower() or 'score' in c.lower() or 'pred' in c.lower()), None)
+    # fuzzy column detection - Prioritize 'prob' over 'pred'
+    # We look for specific keywords in priority order
+    risk_col = None
+    candidates = df.columns.tolist()
+    
+    # Priority 1: Contains 'prob' (e.g. prob_churn, probability)
+    for c in candidates:
+        if 'prob' in c.lower():
+            risk_col = c
+            break
+            
+    # Priority 2: Contains 'score'
+    if not risk_col:
+        for c in candidates:
+            if 'score' in c.lower():
+                risk_col = c
+                break
+                
+    # Priority 3: Fallback (but dangerous as it might be class labels)
+    if not risk_col:
+        for c in candidates:
+            if 'pred' in c.lower() and df[c].dtype.kind in 'fi': # Only if float/int
+                risk_col = c
+                break
     
     if not risk_col:
-        st.error(f"⚠️ Could not find a risk probability column. Available columns: {df.columns.tolist()}")
+        st.error(f"⚠️ Could not find a numeric risk column. Available columns: {df.columns.tolist()}")
         return
     else:
-        # Standardize for the function
-        df['prob_churn'] = df[risk_col]
+        # Standardize and Ensure Numeric
+        try:
+            df['prob_churn'] = pd.to_numeric(df[risk_col], errors='coerce')
+        except Exception as e:
+            st.error(f"Error converting column '{risk_col}' to numbers: {str(e)}")
+            return
 
     # 1. TOP METRICS
-    avg_churn = df['prob_churn'].mean()
+    # Drop NaNs just for the stats to avoid errors
+    valid_df = df.dropna(subset=['prob_churn'])
+    
+    avg_churn = valid_df['prob_churn'].mean()
     high_risk_df = df[df['prob_churn'] > 0.7].copy()
     high_risk_count = len(high_risk_df)
     
     st.markdown("### 🚨 Dropout Risk Monitor")
     
     col1, col2, col3 = st.columns(3)
-    col1.metric("Average Risk Score", f"{avg_churn:.1%}", delta_color="inverse")
+    if not pd.isna(avg_churn):
+        col1.metric("Average Risk Score", f"{avg_churn:.1%}", delta_color="inverse")
+    else:
+        col1.metric("Average Risk Score", "N/A")
+        
     col2.metric("High Risk Students (>70%)", f"{high_risk_count}", f"{(high_risk_count/len(df)):.1%} of total", delta_color="inverse")
     col3.metric("Safe Students (<30%)", f"{len(df[df['prob_churn'] < 0.3])}", delta="Stable")
     
