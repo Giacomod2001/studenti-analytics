@@ -313,14 +313,6 @@ def main():
     options = ["🏠 Home Dashboard"] + [f"📄 {t['name']}" for t in tables_info]
     selection = st.sidebar.radio("", options, label_visibility="collapsed")
     
-    st.sidebar.markdown("---")
-    with st.sidebar.expander("⚙️ Settings"):
-        if st.button("🔄 Clear Cache"):
-            st.cache_data.clear()
-            st.cache_resource.clear()
-            st.rerun()
-        st.info("Cache TTL: 10 min")
-        
     # Routing
     if selection == "🏠 Home Dashboard":
         render_home_dashboard(tables_info)
