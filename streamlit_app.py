@@ -233,7 +233,7 @@ def render_table_inspection(df: pd.DataFrame, table_info: dict):
                             corr, 
                             text_auto='.2f', 
                             title="Correlation Matrix", 
-                            color_continuous_scale=['#0d1117', '#0077B5', '#00A0DC'],
+                            color_continuous_scale='RdBu_r',
                             aspect="auto"
                         )
                     else:
