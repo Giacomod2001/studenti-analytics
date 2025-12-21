@@ -26,47 +26,116 @@ logger = logging.getLogger(__name__)
 
 def render_home_dashboard(tables_info):
     """
-    Main dashboard with aggregated KPIs and Standard UI.
+    Main dashboard with real KPIs and actionable insights.
     """
     st.title("Student Analytics Dashboard")
     st.caption("AI-Powered Dropout Prediction and Retention Intelligence")
     
     st.markdown("---")
     
-    # KPI Section - Standard Streamlit Metrics
+    # Load actual data for insights
+    try:
+        df_churn = data_utils.load_table_data_optimized("studenti_churn_pred")
+        df_students = data_utils.load_table_data_optimized("studenti")
+        df_clusters = data_utils.load_table_data_optimized("studenti_cluster")
+        df_features = data_utils.load_table_data_optimized("feature_importance_studenti")
+    except:
+        df_churn = pd.DataFrame()
+        df_students = pd.DataFrame()
+        df_clusters = pd.DataFrame()
+        df_features = pd.DataFrame()
+    
+    # ==================== KEY METRICS ====================
+    st.header("Key Performance Indicators")
+    
     col1, col2, col3, col4 = st.columns(4)
     
-    total_rows = sum(t["rows"] for t in tables_info)
-    total_size = sum(t["size_mb"] for t in tables_info)
-    last_update = max([t["created"] for t in tables_info]) if tables_info else "N/A"
-    if hasattr(last_update, 'strftime'):
-        last_update = last_update.strftime("%d/%m")
-
-    col1.metric("Datasets", len(tables_info))
-    col2.metric("Total Records", f"{total_rows:,}")
-    col3.metric("Size in Cloud", f"{total_size:.1f} MB")
-    col4.metric("Last Update", last_update)
+    total_students = len(df_students) if not df_students.empty else 0
+    
+    # Dropout risk metrics
+    if not df_churn.empty and 'churn_percentage' in df_churn.columns:
+        churn_vals = df_churn['churn_percentage'].copy()
+        if churn_vals.mean() > 1:
+            churn_vals = churn_vals / 100
+        avg_risk = churn_vals.mean() * 100
+        high_risk_count = len(df_churn[churn_vals > 0.7])
+        high_risk_pct = (high_risk_count / len(df_churn)) * 100 if len(df_churn) > 0 else 0
+    else:
+        avg_risk = 0
+        high_risk_count = 0
+        high_risk_pct = 0
+    
+    n_clusters = df_clusters['cluster'].nunique() if not df_clusters.empty and 'cluster' in df_clusters.columns else 0
+    
+    col1.metric("Total Students", f"{total_students:,}")
+    col2.metric("Average Dropout Risk", f"{avg_risk:.1f}%")
+    col3.metric("High Risk Students", f"{high_risk_count:,}", delta=f"{high_risk_pct:.1f}% of total")
+    col4.metric("Behavioral Segments", n_clusters)
     
     st.markdown("---")
     
-    st.header("Data Warehouse Catalogue")
-    st.info("Select a dataset below to explore insights, visualize trends, and export data.")
+    # ==================== RISK ANALYSIS ====================
+    col_left, col_right = st.columns([2, 1])
     
-    # Grid layout for table cards
-    cols = st.columns(3)
-    for idx, t in enumerate(tables_info):
-        with cols[idx % 3]:
-            # Standard Streamlit Container
-            origin_badge = "ML Generated" if "pred" in t['id'] or "cluster" in t['id'] else "Raw Data"
+    with col_left:
+        st.header("Dropout Risk Distribution")
+        
+        if not df_churn.empty and 'churn_percentage' in df_churn.columns:
+            churn_vals = df_churn['churn_percentage'].copy()
+            if churn_vals.mean() > 1:
+                churn_vals = churn_vals / 100
             
-            with st.container(border=True):
-                st.subheader(t['name'])
-                st.caption(f"**{origin_badge}**")
-                st.write(t['description'])
-                st.divider()
-                c1, c2 = st.columns(2)
-                c1.caption(f"**Rows:** {t['rows']:,}")
-                c2.caption(f"**Size:** {t['size_mb']} MB")
+            df_risk = pd.DataFrame({'Risk Score': churn_vals * 100})
+            df_risk['Risk Category'] = pd.cut(
+                df_risk['Risk Score'], 
+                bins=[0, 30, 70, 100], 
+                labels=['Low Risk', 'Medium Risk', 'High Risk']
+            )
+            
+            risk_counts = df_risk['Risk Category'].value_counts().reset_index()
+            risk_counts.columns = ['Category', 'Count']
+            
+            fig = px.bar(
+                risk_counts, x='Category', y='Count', color='Category',
+                color_discrete_map={'Low Risk': '#00C853', 'Medium Risk': '#FFB300', 'High Risk': '#E53935'},
+                title="Students by Risk Level"
+            )
+            fig = styles_config.apply_chart_theme(fig)
+            fig.update_layout(showlegend=False)
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Dropout prediction data not available.")
+    
+    with col_right:
+        st.header("Risk Summary")
+        
+        if not df_churn.empty and 'churn_percentage' in df_churn.columns:
+            churn_vals = df_churn['churn_percentage'].copy()
+            if churn_vals.mean() > 1:
+                churn_vals = churn_vals / 100
+            low_risk = len(df_churn[churn_vals <= 0.3])
+            med_risk = len(df_churn[(churn_vals > 0.3) & (churn_vals <= 0.7)])
+            high_risk = len(df_churn[churn_vals > 0.7])
+            
+            st.success(f"**Low Risk:** {low_risk:,} students")
+            st.warning(f"**Medium Risk:** {med_risk:,} students")
+            st.error(f"**High Risk:** {high_risk:,} students")
+            
+            st.markdown("---")
+            st.markdown("**Recommended Actions:**")
+            st.markdown("- Review high-risk students")
+            st.markdown("- Schedule counseling")
+            st.markdown("- Analyze risk factors")
+    
+    st.markdown("---")
+    
+    # ==================== DATA CATALOGUE (Compact) ====================
+    with st.expander("Data Catalogue", expanded=False):
+        cols = st.columns(4)
+        for idx, t in enumerate(tables_info):
+            with cols[idx % 4]:
+                st.markdown(f"**{t['name']}**")
+                st.caption(f"{t['rows']:,} rows")
 
 
 def render_key_insights(df: pd.DataFrame, table_id: str):
