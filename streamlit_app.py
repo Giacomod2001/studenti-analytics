@@ -324,30 +324,62 @@ def render_table_inspection(df: pd.DataFrame, table_info: dict):
 def main():
     styles_config.inject_custom_css()
     
-    # Sidebar Navigation
-    st.sidebar.title("Student Analytics")
-    st.sidebar.caption("v2.0 | BigQuery Powered")
-    
-    # Connection status
-    client = data_utils.get_bigquery_client()
-    if not client:
-        st.error("Critical error: Unable to connect to BigQuery.")
-        st.stop()
+    # ==================== SIDEBAR ====================
+    with st.sidebar:
+        # Header
+        st.title("Student Analytics")
+        st.caption("v2.0 | BigQuery Powered")
         
-    # Load metadata (cached)
-    with st.spinner("Loading catalogue..."):
+        st.divider()
+        
+        # Connection check
+        client = data_utils.get_bigquery_client()
+        if not client:
+            st.error("Unable to connect to BigQuery")
+            st.stop()
+        
+        # Load metadata
         tables_info = data_utils.get_tables_metadata_cached()
-    
-    if not tables_info:
-        st.warning("No tables found.")
-        st.stop()
         
-    # Navigation Menu
-    st.sidebar.markdown("### Navigation")
-    options = ["Home Dashboard"] + [t['name'] for t in tables_info]
-    selection = st.sidebar.radio("", options, label_visibility="collapsed")
+        if not tables_info:
+            st.warning("No tables found")
+            st.stop()
+        
+        # Navigation
+        st.markdown("### Navigation")
+        
+        # Organize tables by type
+        ml_tables = [t for t in tables_info if "pred" in t['id'] or "cluster" in t['id'] or "importance" in t['id']]
+        raw_tables = [t for t in tables_info if t not in ml_tables]
+        
+        options = ["Home Dashboard"]
+        
+        # Add ML tables first
+        if ml_tables:
+            options.extend([t['name'] for t in ml_tables])
+        
+        # Add raw tables
+        if raw_tables:
+            options.extend([t['name'] for t in raw_tables])
+        
+        selection = st.radio("", options, label_visibility="collapsed")
+        
+        st.divider()
+        
+        # Quick Stats
+        st.markdown("### Quick Stats")
+        col1, col2 = st.columns(2)
+        col1.metric("Tables", len(tables_info))
+        total_rows = sum(t['rows'] for t in tables_info)
+        col2.metric("Records", f"{total_rows//1000}K")
+        
+        st.divider()
+        
+        # Footer
+        st.caption("Powered by BigQuery and Streamlit")
+        st.caption("[View on GitHub](https://github.com/Giacomod2001/studenti-analytics)")
     
-    # Routing
+    # ==================== MAIN CONTENT ====================
     if selection == "Home Dashboard":
         render_home_dashboard(tables_info)
     else:
@@ -364,3 +396,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
