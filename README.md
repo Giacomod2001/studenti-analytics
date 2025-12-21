@@ -168,8 +168,11 @@ All final implementations, testing, and documentation were carried out independe
 
 ## Authors
 
-- Giacomo D'Onofrio
-- Project Team Members
+- Alessandro Geli
+- Giacomo Dellacqua
+- Paolo Junior Del Giudice
+- Ruben Scoletta
+- Luca Tallarico
 
 ---
 
