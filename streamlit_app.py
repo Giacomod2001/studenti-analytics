@@ -3,16 +3,14 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from google.cloud import bigquery
-from google.oauth2 import service_account
 import logging
 
-# Custom Modules
-import styles_config
-import ml_utils
+# Local Modules
 import constants
+import styles_config
+import data_utils
 
-# ─── 1) CONFIGURATION ──────────────────────────────────────────────────────
+# ─── 1) PAGE CONFIGURATION ─────────────────────────────────────────────────
 
 st.set_page_config(
     page_title="Student Analytics Dashboard",
@@ -24,200 +22,276 @@ st.set_page_config(
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-PROJECT_ID = "laboratorio-ai-460517"
-DATASET_ID = "dataset"
+# ─── 2) RENDERING FUNCTIONS ────────────────────────────────────────────────
 
-# ─── 2) DATA MANAGEMENT ────────────────────────────────────────────────────
-
-@st.cache_resource
-def get_bigquery_client():
-    try:
-        credentials_dict = dict(st.secrets)
-        if "private_key" in st.secrets:
-             credentials_dict = {k: st.secrets.get(k) for k in [
-                 "type", "project_id", "private_key_id", "private_key", 
-                 "client_email", "client_id", "auth_uri", "token_uri", 
-                 "auth_provider_x509_cert_url", "client_x509_cert_url", "universe_domain"
-             ]}
-        
-        credentials = service_account.Credentials.from_service_account_info(credentials_dict)
-        return bigquery.Client(credentials=credentials, project=PROJECT_ID)
-    except Exception as e:
-        logger.error(f"Error initializing BQ client: {e}")
-        return None
-
-@st.cache_data(ttl=600, show_spinner=False)
-def get_tables_metadata_cached():
-    client = get_bigquery_client()
-    if not client: return []
-    try:
-        dataset_ref = client.dataset(DATASET_ID)
-        tables = list(client.list_tables(dataset_ref))
-        
-        return sorted([
-            {
-                "id": t.table_id,
-                "name": constants.TABLE_DISPLAY_NAMES.get(t.table_id, t.table_id),
-                "description": constants.TABLE_DESCRIPTIONS.get(t.table_id, "N/A"),
-                "rows": (obj := client.get_table(dataset_ref.table(t.table_id))).num_rows,
-                "size_mb": round(obj.num_bytes / (1024**2), 2) if obj.num_bytes else 0,
-                "created": obj.created
-            }
-            for t in tables
-        ], key=lambda x: x["id"])
-    except Exception as e:
-        logger.error(f"Error metadata: {e}")
-        return []
-
-@st.cache_data(ttl=600, show_spinner=False)
-def load_table_data(table_id: str):
-    client = get_bigquery_client()
-    if not client: return pd.DataFrame()
-    try:
-        df = client.query(f"SELECT * FROM `{PROJECT_ID}.{DATASET_ID}.{table_id}`").to_dataframe()
-        # Optimization
-        for col in df.select_dtypes(include=['object']):
-            if df[col].nunique() / len(df) < 0.5:
-                df[col] = df[col].astype('category')
-        return df
-    except Exception as e:
-        logger.error(f"Error loading {table_id}: {e}")
-        return pd.DataFrame()
-
-# ─── 3) VISUALIZATION ──────────────────────────────────────────────────────
-
-def render_home(tables_info):
+def render_home_dashboard(tables_info):
+    """
+    Main dashboard with aggregated KPIs and Standard UI.
+    """
     st.title("Student Analytics Dashboard")
+    st.caption("AI-Powered Dropout Prediction and Retention Intelligence")
     
-    st.markdown("""
-    <div class="glass-card">
-        <h4>About this Platform</h4>
-        <p>A professional ML platform for predicting university dropout risk and analyzing student performance.</p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown("---")
     
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Datasets", len(tables_info))
-    c2.metric("Records", f"{sum(t['rows'] for t in tables_info):,}")
-    c3.metric("Size", f"{sum(t['size_mb'] for t in tables_info):.1f} MB")
+    # KPI Section - Standard Streamlit Metrics
+    col1, col2, col3, col4 = st.columns(4)
     
-    last_update = max(t['created'] for t in tables_info) if tables_info else "N/A"
-    c4.metric("Last Update", last_update.strftime("%d/%m/%Y") if hasattr(last_update, 'strftime') else "N/A")
+    total_rows = sum(t["rows"] for t in tables_info)
+    total_size = sum(t["size_mb"] for t in tables_info)
+    last_update = max([t["created"] for t in tables_info]) if tables_info else "N/A"
+    if hasattr(last_update, 'strftime'):
+        last_update = last_update.strftime("%d/%m")
+
+    col1.metric("Datasets", len(tables_info))
+    col2.metric("Total Records", f"{total_rows:,}")
+    col3.metric("Size in Cloud", f"{total_size:.1f} MB")
+    col4.metric("Last Update", last_update)
     
-    st.markdown("### Data Catalogue")
+    st.markdown("---")
+    
+    st.header("Data Warehouse Catalogue")
+    st.info("Select a dataset below to explore insights, visualize trends, and export data.")
+    
+    # Grid layout for table cards
     cols = st.columns(3)
-    for i, t in enumerate(tables_info):
-        with cols[i % 3]:
-            st.markdown(f"""
-            <div class="glass-card" style="height: 100%;">
-                <h4>{t['name']}</h4>
-                <p style="color: #8b949e; font-size: 0.9em;">{t['description']}</p>
-                <div style="margin-top: 10px; font-size: 0.8em; color: #8b949e;">
-                    {t['rows']:,} rows | {t['size_mb']} MB
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-def render_analysis(df, table_info):
-    st.title(table_info['name'])
-    
-    tab1, tab2, tab3 = st.tabs(["Explore", "Visuals", "Info"])
-    
-    with tab1:
-        st.dataframe(df, use_container_width=True, height=600)
-    
-    with tab2:
-        # Auto-viz
-        num_cols = df.select_dtypes(include=np.number).columns
-        if not num_cols.empty:
-            c1, c2 = st.columns([1, 3])
-            with c1:
-                x_axis = st.selectbox("X Axis", df.columns)
-                y_axis = st.selectbox("Y Axis", num_cols)
-                chart_type = st.selectbox("Type", ["Bar", "Scatter", "Box"])
+    for idx, t in enumerate(tables_info):
+        with cols[idx % 3]:
+            # Standard Streamlit Container
+            origin_badge = "ML Generated" if "pred" in t['id'] or "cluster" in t['id'] else "Raw Data"
             
-            with c2:
-                if chart_type == "Bar":
-                    fig = px.bar(df, x=x_axis, y=y_axis)
-                elif chart_type == "Scatter":
-                    fig = px.scatter(df, x=x_axis, y=y_axis)
-                else:
-                    fig = px.box(df, x=x_axis, y=y_axis)
-                
-                st.plotly_chart(styles_config.apply_chart_theme(fig), use_container_width=True)
-        else:
-            st.info("No numerical data for automatic visualization.")
-
-    with tab3:
-        st.markdown(constants.TABLE_ORIGINS.get(table_info['id'], "No info."))
-
-def render_live_ml():
-    st.title("Live Clustering Analysis")
-    st.markdown("""
-    <div class="glass-card">
-        Train a new <strong>K-Means Clustering</strong> model in real-time.
-        This uses the <code>ml_utils</code> pipeline with scaling, PCA, and Silhouette validation.
-    </div>
-    """, unsafe_allow_html=True)
-
-    if st.button("Train Model"):
-        with st.spinner("Loading raw data..."):
-            df = load_table_data("studenti")
-        
-        if df.empty:
-            st.error("Could not load 'studenti' table.")
-            return
-
-        with st.spinner("Training model (~30s)..."):
-            try:
-                results = ml_utils.train_improved_clustering(df, n_clusters=4)
-                
-                # Metrics
+            with st.container(border=True):
+                st.subheader(t['name'])
+                st.caption(f"**{origin_badge}**")
+                st.write(t['description'])
+                st.divider()
                 c1, c2 = st.columns(2)
-                c1.metric("Silhouette Score (Quality)", f"{results['silhouette_score']:.3f}")
-                c2.metric("Inertia", f"{results['inertia']:.0f}")
-                
-                # Visualization
-                df_viz = pd.DataFrame(results['X_final'][:, :2], columns=['PC1', 'PC2'])
-                df_viz['Cluster'] = results['labels'].astype(str)
-                
-                fig = px.scatter(df_viz, x='PC1', y='PC2', color='Cluster', 
-                               title="Cluster Visualization (PCA Projection)")
-                st.plotly_chart(styles_config.apply_chart_theme(fig), use_container_width=True)
-                
-                st.write("Feature Names used:", results['features_used'])
-                
-            except Exception as e:
-                st.error(f"Training failed: {e}")
+                c1.caption(f"**Rows:** {t['rows']:,}")
+                c2.caption(f"**Size:** {t['size_mb']} MB")
 
-# ─── 4) MAIN ENTRYPOINT ────────────────────────────────────────────────────
+
+def render_key_insights(df: pd.DataFrame, table_id: str):
+    """
+    Renders text-based insights using correct column names.
+    """
+    if table_id == "studenti_churn_pred":
+        if 'churn_percentage' in df.columns:
+            mean_val = df['churn_percentage'].mean()
+            if mean_val > 1:
+                df['churn_percentage'] = df['churn_percentage'] / 100
+                
+            avg_churn = df['churn_percentage'].mean()
+            high_risk = df[df['churn_percentage'] > 0.7].shape[0]
+            total = len(df)
+            pct_risk = (high_risk / total) * 100 if total > 0 else 0
+            
+            st.info(f"""
+            **Key Insights:**
+            - **Average Dropout Risk:** {avg_churn:.1%}
+            - **Critical Students:** {high_risk} ({pct_risk:.1%} of total)
+            - **Action:** {high_risk} students require immediate counseling intervention.
+            """)
+        else:
+             st.warning("Insight not available: 'churn_percentage' column missing.")
+    
+    elif table_id == "feature_importance_studenti":
+        importance_cols = [col for col in df.columns if 'importance' in col.lower() or 'peso' in col.lower() or 'percentuale' in col.lower()]
+        feature_col = next((col for col in df.columns if 'feature' in col.lower() or 'caratteristica' in col.lower()), df.columns[0])
+        
+        if importance_cols:
+            top_3 = df.sort_values(by=importance_cols[0], ascending=False).head(3)
+            
+            msg = "**Top 3 Drivers of Dropout:**\n"
+            for _, row in top_3.iterrows():
+                msg += f"- **{row[feature_col]}**: {row[importance_cols[0]]:.2f} impact\n"
+            
+            st.info(msg)
+    
+    elif table_id == "studenti_cluster":
+        cluster_col = next((col for col in df.columns if 'cluster' in col.lower()), None)
+        if cluster_col:
+            top_cluster = df[cluster_col].value_counts().idxmax()
+            counts = df[cluster_col].value_counts()
+            
+            st.info(f"""
+            **Segmentation Summary:**
+            - **Dominant Group:** Cluster "{top_cluster}" ({counts[top_cluster]} students)
+            - **Distribution:** {len(counts)} distinct behavioral profiles identified.
+            """)
+
+
+def render_table_inspection(df: pd.DataFrame, table_info: dict):
+    """
+    Detailed visualization of a single table.
+    """
+    # Header with metadata
+    col_head_1, col_head_2 = st.columns([3, 1])
+    with col_head_1:
+        st.title(table_info['name'])
+        st.markdown(f"*{table_info['description']}*")
+    with col_head_2:
+        st.download_button(
+            label="Export CSV",
+            data=df.to_csv(index=False).encode("utf-8"),
+            file_name=f"{table_info['name']}.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+    
+    # Quick metrics
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Rows", f"{len(df):,}")
+    m2.metric("Columns", len(df.columns))
+    missing_pct = round(df.isna().sum().sum() / (len(df) * len(df.columns)) * 100, 2) if not df.empty else 0
+    m3.metric("Missing Values", f"{missing_pct}%")
+    mem_mb = round(df.memory_usage(deep=True).sum() / (1024 * 1024), 2) if not df.empty else 0
+    m4.metric("Memory", f"{mem_mb} MB")
+    
+    st.markdown("---")
+
+    # Tabs
+    tab_data, tab_stats, tab_info = st.tabs(["Explore Data", "Statistics and Charts", "Info and Origin"])
+    
+    with tab_data:
+        # Quick filters
+        with st.expander("Advanced Filters", expanded=False):
+            col_f1, col_f2 = st.columns([1, 2])
+            with col_f1:
+                search = st.text_input("Search text", placeholder="Type to filter...")
+            with col_f2:
+                cols = st.multiselect("Visible columns", df.columns.tolist(), default=df.columns.tolist()[:8])
+        
+        df_view = df.copy()
+        if search:
+            mask = df_view.astype(str).apply(lambda x: x.str.contains(search, case=False, na=False)).any(axis=1)
+            df_view = df_view[mask]
+        
+        if cols:
+            st.dataframe(df_view[cols].head(200), use_container_width=True, height=500)
+            st.caption(f"Showing {min(200, len(df_view))} of {len(df_view)} filtered rows.")
+        else:
+            st.warning("Select at least one column.")
+
+    with tab_stats:
+        # Render Text Insights
+        render_key_insights(df, table_info["id"])
+        st.markdown("---")
+        
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        
+        col_viz_1, col_viz_2 = st.columns([1, 3])
+        
+        with col_viz_1:
+            st.markdown("#### Configuration")
+            chart_type = st.selectbox("Chart Type", ["Histogram", "Box Plot", "Scatter", "Bar Chart", "Heatmap"], index=0)
+            
+            x_axis = st.selectbox("X Axis", df.columns)
+            y_axis = st.selectbox("Y Axis", [None] + numeric_cols) if chart_type != "Heatmap" else None
+            color_dim = st.selectbox("Color", [None] + df.columns.tolist()) if chart_type != "Heatmap" else None
+            
+        with col_viz_2:
+            try:
+                fig = None
+                default_color = '#0077B5'
+                
+                if chart_type == "Histogram":
+                    fig = px.histogram(
+                        df, x=x_axis, y=y_axis, color=color_dim, 
+                        title=f"Distribution of {x_axis}",
+                        color_discrete_sequence=[default_color] if not color_dim else None
+                    )
+                elif chart_type == "Box Plot":
+                    fig = px.box(
+                        df, x=x_axis, y=y_axis, color=color_dim, 
+                        title=f"Box Plot: {x_axis}",
+                        color_discrete_sequence=[default_color] if not color_dim else None
+                    )
+                elif chart_type == "Scatter":
+                    fig = px.scatter(
+                        df, x=x_axis, y=y_axis, color=color_dim, 
+                        title=f"Scatter: {x_axis} vs {y_axis}",
+                        color_discrete_sequence=[default_color] if not color_dim else None
+                    )
+                elif chart_type == "Bar Chart":
+                    if len(df) > 1000 and y_axis:
+                        df_agg = df.groupby(x_axis)[y_axis].mean().reset_index()
+                        fig = px.bar(
+                            df_agg, x=x_axis, y=y_axis, 
+                            color=color_dim if color_dim in df_agg else None, 
+                            title=f"Average {y_axis} by {x_axis}",
+                            color_discrete_sequence=[default_color] if not color_dim or color_dim not in df_agg else None
+                        )
+                    else:
+                        fig = px.bar(
+                            df, x=x_axis, y=y_axis, color=color_dim, 
+                            title=f"Bar Chart: {x_axis}",
+                            color_discrete_sequence=[default_color] if not color_dim else None
+                        )
+                elif chart_type == "Heatmap":
+                    if len(numeric_cols) > 1:
+                        corr = df[numeric_cols].corr()
+                        fig = px.imshow(
+                            corr, 
+                            text_auto='.2f', 
+                            title="Correlation Matrix", 
+                            color_continuous_scale=['#0d1117', '#0077B5', '#00A0DC'],
+                            aspect="auto"
+                        )
+                    else:
+                        st.info("Need at least 2 numerical columns for Heatmap.")
+
+                if fig:
+                    fig = styles_config.apply_chart_theme(fig)
+                    st.plotly_chart(fig, use_container_width=True)
+            except Exception as e:
+                st.error(f"Error creating chart: {e}")
+
+    with tab_info:
+        st.markdown("### Origin and Description")
+        origin_text = constants.TABLE_ORIGINS.get(table_info["id"], "No detailed information available.")
+        st.markdown(origin_text)
+
+# ─── 3) MAIN APP ────────────────────────────────────────────────────────────
 
 def main():
     styles_config.inject_custom_css()
     
-    st.sidebar.title("Analytics")
+    # Sidebar Navigation
+    st.sidebar.title("Student Analytics")
+    st.sidebar.caption("v2.0 | BigQuery Powered")
     
-    # Check connection
-    if not get_bigquery_client():
-        st.error("Connection failed.")
+    # Connection status
+    client = data_utils.get_bigquery_client()
+    if not client:
+        st.error("Critical error: Unable to connect to BigQuery.")
         st.stop()
         
-    tables = get_tables_metadata_cached()
+    # Load metadata (cached)
+    with st.spinner("Loading catalogue..."):
+        tables_info = data_utils.get_tables_metadata_cached()
     
-    # Navigation
-    menu = ["Home"] + [t['name'] for t in tables] + ["Live Analysis"]
-    choice = st.sidebar.radio("Go to", menu, label_visibility="collapsed")
+    if not tables_info:
+        st.warning("No tables found.")
+        st.stop()
+        
+    # Navigation Menu
+    st.sidebar.markdown("### Navigation")
+    options = ["Home Dashboard"] + [t['name'] for t in tables_info]
+    selection = st.sidebar.radio("", options, label_visibility="collapsed")
     
-    if choice == "Home":
-        render_home(tables)
-    elif choice == "Live Analysis":
-        render_live_ml()
+    # Routing
+    if selection == "Home Dashboard":
+        render_home_dashboard(tables_info)
     else:
-        # Find table info by name
-        info = next(t for t in tables if t['name'] == choice)
-        with st.spinner(f"Loading {info['name']}..."):
-            df = load_table_data(info['id'])
-        render_analysis(df, info)
+        current_info = next((t for t in tables_info if t["name"] == selection), None)
+        
+        if current_info:
+            with st.spinner(f"Loading {selection}..."):
+                df = data_utils.load_table_data_optimized(current_info["id"])
+                
+            if not df.empty:
+                render_table_inspection(df, current_info)
+            else:
+                st.warning(f"Table {selection} is empty or unable to load.")
 
 if __name__ == "__main__":
     main()
