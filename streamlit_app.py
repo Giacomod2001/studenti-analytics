@@ -131,9 +131,9 @@ def render_intervention_console():
     
     # Filter Logic Calculations (Pre-calc for UI counts)
     if not df.empty and 'churn_percentage' in df.columns:
-        n_crit = len(df[df['churn_percentage'] >= 70])
-        n_mon = len(df[(df['churn_percentage'] >= 40) & (df['churn_percentage'] < 70)])
-        n_safe = len(df[df['churn_percentage'] < 40])
+        n_crit = len(df[df['churn_percentage'] >= 75])
+        n_mon = len(df[(df['churn_percentage'] >= 35) & (df['churn_percentage'] < 75)])
+        n_safe = len(df[df['churn_percentage'] < 35])
         n_total = len(df)
     else:
         n_crit, n_mon, n_safe, n_total = 0, 0, 0, 0
@@ -147,9 +147,9 @@ def render_intervention_console():
             "Risk Segment", 
             [
                 f"All Students ({n_total:,})", 
-                f"Critical ({n_crit:,})", 
-                f"Monitor ({n_mon:,})", 
-                f"Safe ({n_safe:,})"
+                f"Critical (>75%)", 
+                f"Monitor (35-75%)", 
+                f"Safe (<35%)"
             ], 
             index=0, 
             horizontal=True, 
@@ -166,14 +166,14 @@ def render_intervention_console():
     
     if not df.empty:
         if "Critical" in risk_mode: 
-            filtered_df = df[df['churn_percentage'] >= 70]
-            filter_desc = "Critical Risk (>70%)"
+            filtered_df = df[df['churn_percentage'] >= 75]
+            filter_desc = "Critical Risk (>75%)"
         elif "Monitor" in risk_mode: 
-            filtered_df = df[(df['churn_percentage'] >= 40) & (df['churn_percentage'] < 70)]
-            filter_desc = "Monitor List (40-70%)"
+            filtered_df = df[(df['churn_percentage'] >= 35) & (df['churn_percentage'] < 75)]
+            filter_desc = "Monitor List (35-75%)"
         elif "Safe" in risk_mode:
-            filtered_df = df[df['churn_percentage'] < 40]
-            filter_desc = "Safe Zone (<40%)"
+            filtered_df = df[df['churn_percentage'] < 35]
+            filter_desc = "Safe Zone (<35%)"
         
     st.markdown("<br>", unsafe_allow_html=True)
     
@@ -296,25 +296,59 @@ def render_student_360():
             )
     
     with tab_satisfaction:
-        st.subheader("Voice of Student")
+        st.subheader("Voice of Student Analysis")
+        st.markdown("Identify discrepancies between academic performance (expected satisfaction) and reported experience.")
+        
         df_sat = data_utils.load_table_data_optimized("report_finale_soddisfazione_studenti")
         
         if not df_sat.empty:
-             val_counts = len(df_sat[df_sat['soddisfazione_predetta'] < 6])
-             st.metric("Students with Low Satisfaction (<6.0)", f"{val_counts:,}", help="Priority for engagement")
+             # Derive Actionable Insights in Python
+             # Real < Pred: "Silent Burnout" (Doing clearly worse than data suggests they should feel)
+             # Real > Pred: "Resilient" (Happier than their grades suggest)
              
+             df_sat['gap'] = df_sat['soddisfazione_reale'] - df_sat['soddisfazione_predetta']
+             
+             def classify_sentiment(row):
+                 if row['gap'] < -1.5:
+                     return "⚠️ Silent Burnout"
+                 elif row['gap'] > 1.5:
+                     return "⭐ Resilient"
+                 elif row['soddisfazione_reale'] < 6.0:
+                     return "🔴 At Risk"
+                 else:
+                     return "✅ Aligned"
+
+             df_sat['psychometric_status'] = df_sat.apply(classify_sentiment, axis=1)
+             
+             # Metric Summary
+             burnout_count = len(df_sat[df_sat['psychometric_status'] == "⚠️ Silent Burnout"])
+             
+             c1, c2 = st.columns(2)
+             with c1:
+                st.metric(
+                    "Potential Silent Burnouts", 
+                    f"{burnout_count:,}", 
+                    help="Students with good grades but surprisingly low satisfaction. High risk of sudden churn."
+                )
+             with c2:
+                avg_sat = df_sat['soddisfazione_reale'].mean()
+                st.metric("Avg Reported Satisfaction", f"{avg_sat:.1f}/10")
+
         st.dataframe(
-            df_sat.head(200), 
+            df_sat.head(100), 
             use_container_width=True,
             column_config={
-                "soddisfazione_predetta": st.column_config.NumberColumn("Predicted CSAT", format="%.1f / 10")
+                "soddisfazione_reale": st.column_config.NumberColumn("Reported Score", format="%.1f"),
+                "soddisfazione_predetta": st.column_config.NumberColumn("Expected (AI)", format="%.1f"),
+                "psychometric_status": st.column_config.TextColumn("Psychometric Profile"),
+                "livello_affidabilita": None # Hide technical column
             }
         )
 
     with tab_features:
         st.subheader("Model Explainability")
         df_feat = data_utils.load_table_data_optimized("feature_importance_studenti")
-        st.bar_chart(df_feat.set_index('feature')['peso_importanza'], color="#da3633")
+        st.bar_chart(df_feat.set_index('caratteristica')['peso_importanza'], color="#da3633")
         
 # ─── 6) LANDING PAGE ───────────────────────────────────────────────────────
 
