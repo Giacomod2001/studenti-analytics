@@ -121,7 +121,8 @@ div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
 /* =============================================================================
    BUTTONS
    ============================================================================= */
-.stButton > button {
+/* Default Main Area Buttons (Action) */
+.stMain .stButton > button {
     background-color: #238636 !important; /* Green Action */
     color: white !important;
     border: 1px solid rgba(240, 246, 252, 0.1) !important;
@@ -129,8 +130,32 @@ div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
     font-weight: 500;
 }
 
-.stButton > button:hover {
+.stMain .stButton > button:hover {
     background-color: #2ea043 !important;
+    box-shadow: 0 0 8px rgba(46, 160, 67, 0.4);
+}
+
+/* Sidebar Navigation Buttons (Ghost Style) */
+section[data-testid="stSidebar"] .stButton > button {
+    background-color: transparent !important;
+    color: #C9D1D9 !important;
+    border: 1px solid transparent !important;
+    text-align: left !important;
+    padding-left: 0px !important;
+    font-weight: 400 !important;
+    transition: all 0.2s ease;
+}
+
+section[data-testid="stSidebar"] .stButton > button:hover {
+    background-color: #21262D !important;
+    border: 1px solid #30363D !important;
+    color: #58A6FF !important;
+    padding-left: 10px !important; /* Slide effect */
+}
+
+section[data-testid="stSidebar"] .stButton > button:focus {
+    color: #58A6FF !important;
+    border-color: #58A6FF !important;
 }
 
 /* Secondary / Export Buttons */
