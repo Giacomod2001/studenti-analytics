@@ -135,27 +135,30 @@ div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
     box-shadow: 0 0 8px rgba(218, 54, 51, 0.4);
 }
 
-/* Sidebar Navigation Buttons (Ghost Style) */
+/* Sidebar Navigation Buttons (Enhanced Visibility) */
 section[data-testid="stSidebar"] .stButton > button {
-    background-color: transparent !important;
+    background-color: #21262D !important; /* Visible background */
     color: #C9D1D9 !important;
-    border: 1px solid transparent !important;
+    border: 1px solid #30363D !important; /* Visible border */
     text-align: left !important;
-    padding-left: 0px !important;
-    font-weight: 400 !important;
+    padding-left: 15px !important;
+    font-weight: 500 !important;
     transition: all 0.2s ease;
+    width: 100%; /* Full width */
 }
 
 section[data-testid="stSidebar"] .stButton > button:hover {
-    background-color: #21262D !important;
-    border: 1px solid #30363D !important;
-    color: #58A6FF !important;
-    padding-left: 10px !important; /* Slide effect */
+    background-color: #30363D !important;
+    border: 1px solid #8B949E !important;
+    color: #58A6FF !important; /* Blue text on hover */
+    padding-left: 20px !important; /* Slide effect */
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 section[data-testid="stSidebar"] .stButton > button:focus {
     color: #58A6FF !important;
     border-color: #58A6FF !important;
+    box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.2) !important;
 }
 
 /* Secondary / Export Buttons */

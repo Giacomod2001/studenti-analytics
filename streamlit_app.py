@@ -138,21 +138,55 @@ def render_intervention_console():
         st.markdown("##### Export")
         st.download_button("Download List", "csv_content", "intervention_list.csv", "text/csv", use_container_width=True)
 
-    # Filter Logic
+    # Filter Logic (Mutually Exclusive for clarity)
+    filter_desc = "Full Population"
     if not df.empty and 'churn_percentage' in df.columns:
-        if "Critical" in tier: df = df[df['churn_percentage'] > 80]
-        elif "High" in tier: df = df[df['churn_percentage'] > 60]
-        elif "Moderate" in tier: df = df[df['churn_percentage'] > 40]
+        if "Critical" in tier: 
+            df = df[df['churn_percentage'] > 80]
+            filter_desc = "Critical Risk Tier (>80%)"
+        elif "High" in tier: 
+            df = df[(df['churn_percentage'] > 60) & (df['churn_percentage'] <= 80)]
+            filter_desc = "High Risk Tier (60-80%)"
+        elif "Moderate" in tier: 
+            df = df[(df['churn_percentage'] > 40) & (df['churn_percentage'] <= 60)]
+            filter_desc = "Moderate Risk Tier (40-60%)"
         
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # 2. MAIN TABLE - Order requested: Data Grid AFTER Report
+    # 2. MAIN TABLE
     
     tab_report, tab_grid = st.tabs(["Intelligence Briefing", "Data Grid"])
     
     with tab_report:
-         # 3. AI REPORT
-        st.markdown(generate_smart_report(df, "Retention Risk"), unsafe_allow_html=True)
+         # 3. AI REPORT - Dynamic based on selection
+        lines = []
+        lines.append(f"""
+        <div class="report-box">
+        <div class="report-header">AI Briefing: {filter_desc}</div>
+        """)
+        
+        if not df.empty:
+            avg_risk = df['churn_percentage'].mean()
+            lines.append(f"<p><strong>Subset Analysis:</strong> Focusing on <strong>{len(df)} students</strong> in this tier.</p>")
+            lines.append(f"<p><strong>Average Risk:</strong> {avg_risk:.1f}%</p>")
+            
+            if "Critical" in tier:
+                lines.append("<p style='color: #FF7B72;'><strong>Urgency:</strong> Immediate 1-on-1 counseling recommended.</p>")
+            elif "High" in tier:
+                lines.append("<p style='color: #D2A8DA;'><strong>Strategy:</strong> Schedule academic plan review within 14 days.</p>")
+            elif "Moderate" in tier:
+                lines.append("<p style='color: #79C0FF;'><strong>Strategy:</strong> Send automated check-in emails and resources.</p>")
+            
+            lines.append("<hr style='border-color: #30363D; margin: 10px 0;'>")
+            lines.append("<p><strong>Top Cases:</strong></p><ul>")
+            for i, row in df.sort_values(by='churn_percentage', ascending=False).head(3).iterrows():
+                 lines.append(f"<li>Student <strong>{row['student_id']}</strong>: {row['churn_percentage']:.1f}%</li>")
+            lines.append("</ul>")
+        else:
+            lines.append("<p>No students found matching this risk profile.</p>")
+            
+        lines.append("</div>")
+        st.markdown("\n".join(lines), unsafe_allow_html=True)
         
     with tab_grid:
         st.dataframe(
