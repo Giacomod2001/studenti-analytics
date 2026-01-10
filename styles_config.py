@@ -1,253 +1,216 @@
 # =============================================================================
-# STYLES_CONFIG.PY - Professional Corporate Design
-# Version 4.0 - Clean, Minimalist, No Emojis
+# STYLES_CONFIG.PY - High Contrast Corporate Theme
+# Version 5.0 - Fixed Visibility \u0026 Usability
 # =============================================================================
 
 import streamlit as st
 
 def inject_custom_css():
-    """Injects professional CSS theme."""
+    """Injects high-contrast professional CSS."""
     st.markdown("""
 <style>
 /* =============================================================================
-   FONTS & GLOBAL VARS
+   RESET & BASICS
    ============================================================================= */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
 
-:root {
-    --primary-color: #0F52BA; /* Sapphire Blue - Professional */
-    --secondary-color: #E1E8ED;
-    --background-color: #F5F7F9; /* Very light gray for corporate feel */
-    --text-color: #2c3e50;
-    --card-bg: white;
+html, body, [class*="css"] {
+    font-family: 'Roboto', sans-serif;
 }
 
-* {
-    font-family: 'Inter', sans-serif !important;
+/* Force Light Background for Main Content Area */
+.stApp {
+    background-color: #F4F6F9;
 }
 
 /* =============================================================================
-   SIDEBAR - Clean & Structured
+   SIDEBAR STYLING - DARK MODE FOR NAV (High Contrast)
    ============================================================================= */
 section[data-testid="stSidebar"] {
-    background-color: #FAFAFA;
-    border-right: 1px solid #E0E0E0;
+    background-color: #1A202C !important; /* Dark Slate */
+    border-right: 1px solid #2D3748;
 }
 
+/* Sidebar Text Color override */
+section[data-testid="stSidebar"] * {
+    color: #E2E8F0 !important;
+}
+
+/* Sidebar Title */
 section[data-testid="stSidebar"] h1 {
-    color: #1a237e !important;
-    font-size: 1.4rem !important;
+    color: #FFFFFF !important;
+    font-size: 1.5rem !important;
     font-weight: 700 !important;
-    border-bottom: 2px solid #0F52BA;
+    border-bottom: 1px solid #4A5568;
     padding-bottom: 1rem;
-    margin-bottom: 2rem !important;
+    margin-bottom: 1.5rem !important;
 }
 
-/* Sidebar Navigation Items */
-section[data-testid="stSidebar"] .stRadio > div > label {
+section[data-testid="stSidebar"] h2, 
+section[data-testid="stSidebar"] h3 {
+    color: #A0AEC0 !important;
+    text-transform: uppercase;
+    font-size: 0.75rem !important;
+    letter-spacing: 0.1em;
+    margin-top: 1.5rem;
+}
+
+/* Radio Buttons (Navigation) */
+section[data-testid="stSidebar"] .stRadio > div {
+    gap: 0px !important;
+}
+
+section[data-testid="stSidebar"] .stRadio label {
     background: transparent !important;
-    color: #455a64 !important;
-    border: none !important;
-    padding: 0.6rem 1rem !important;
-    font-weight: 500 !important;
-    border-left: 3px solid transparent !important;
-    transition: all 0.2s ease;
+    padding: 10px 15px !important;
+    font-size: 0.95rem !important;
+    border-radius: 6px;
+    margin-bottom: 2px !important;
+    color: #CBD5E0 !important;
+    transition: background 0.2s;
 }
 
-section[data-testid="stSidebar"] .stRadio > div > label:hover {
-    background: #F0F4F8 !important;
-    color: #0F52BA !important;
-    border-left: 3px solid #0F52BA !important;
+section[data-testid="stSidebar"] .stRadio label:hover {
+    background: #2D3748 !important;
+    color: #FFFFFF !important;
 }
 
-section[data-testid="stSidebar"] .stRadio > div > label[data-checked="true"] {
-    background: #E3F2FD !important;
-    color: #0F52BA !important;
-    font-weight: 600 !important;
-    border-left: 3px solid #0F52BA !important;
-}
-
-/* =============================================================================
-   MAIN AREA
-   ============================================================================= */
-.stApp {
-    background-color: #FFFFFF;
-}
-
-h1, h2, h3 {
-    color: #1a237e !important;
-    font-weight: 600 !important;
-}
-
-h1 { font-size: 2.2rem !important; margin-bottom: 1rem !important; }
-h2 { font-size: 1.6rem !important; margin-top: 2rem !important; }
-h3 { font-size: 1.2rem !important; color: #455a64 !important; }
-
-/* =============================================================================
-   CARDS & CONTAINERS (KPIs, Features)
-   ============================================================================= */
-.css-1r6slb0, .css-12w0qpk { /* Streamlit metric containers placeholders */
-    background: white;
-    border: 1px solid #E0E0E0;
-    border-radius: 8px;
-    padding: 1rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-}
-
-[data-testid="stMetric"] {
-    background-color: #FFFFFF;
-    border: 1px solid #E0E0E0;
-    padding: 1.5rem !important;
-    border-radius: 8px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-}
-
-[data-testid="stMetricLabel"] {
-    font-size: 0.9rem !important;
-    color: #78909c !important;
+/* Selected Tab in Sidebar */
+section[data-testid="stSidebar"] .stRadio label[data-checked="true"] {
+    background: #3182CE !important; /* Corporate Blue */
+    color: #FFFFFF !important;
     font-weight: 500 !important;
 }
 
-[data-testid="stMetricValue"] {
+/* Divider */
+section[data-testid="stSidebar"] hr {
+    border-color: #4A5568 !important;
+}
+
+/* =============================================================================
+   MAIN CONTENT STYLING
+   ============================================================================= */
+h1 {
+    color: #1A202C !important;
+    font-weight: 700 !important;
+    font-size: 2.25rem !important;
+    padding-bottom: 0.5rem;
+}
+
+h2 {
+    color: #2D3748 !important;
+    font-weight: 600 !important;
+    font-size: 1.5rem !important;
+}
+
+h3 {
+    color: #4A5568 !important;
+    font-weight: 600 !important;
+    font-size: 1.25rem !important;
+}
+
+p, li, .stMarkdown {
+    color: #2D3748 !important;
+    line-height: 1.6;
+}
+
+/* Cards / Containers */
+div[data-testid="stMetric"] {
+    background-color: #FFFFFF !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 8px !important;
+    padding: 20px !important;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+div[data-testid="stMetric"] label {
+    color: #718096 !important; /* Muted Gray */
+    font-size: 0.875rem !important;
+    font-weight: 500 !important;
+}
+
+div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
+    color: #2B6CB0 !important; /* Blue Value */
     font-size: 2rem !important;
-    color: #1a237e !important;
     font-weight: 700 !important;
 }
 
-/* =============================================================================
-   BUTTONS
-   ============================================================================= */
+/* Buttons */
 .stButton > button {
-    background: #0F52BA !important;
+    background-color: #3182CE !important;
     color: white !important;
-    border-radius: 6px !important;
-    border: none !important;
-    padding: 0.6rem 1.5rem !important;
-    font-weight: 600 !important;
-    box-shadow: 0 2px 4px rgba(15, 82, 186, 0.2) !important;
-    transition: background 0.2s ease !important;
+    border-radius: 6px;
+    border: none;
+    padding: 0.5rem 1rem;
+    font-weight: 500;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 .stButton > button:hover {
-    background: #0a3d8f !important;
+    background-color: #2C5282 !important;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
 
-.stDownloadButton > button {
-    background: white !important;
-    border: 1px solid #0F52BA !important;
-    color: #0F52BA !important;
+/* DataFrames */
+.stDataFrame {
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    background: white;
 }
 
-.stDownloadButton > button:hover {
-    background: #F0F4F8 !important;
-}
-
-/* =============================================================================
-   TABS
-   ============================================================================= */
+/* Tabs */
 .stTabs [data-baseweb="tab-list"] {
-    background: transparent;
-    border-bottom: 1px solid #E0E0E0;
-    gap: 2rem;
+    background-color: transparent;
+    border-bottom: 2px solid #E2E8F0;
+    margin-bottom: 1rem;
 }
 
 .stTabs [data-baseweb="tab"] {
     background: transparent !important;
-    border: none !important;
+    color: #718096 !important;
+    font-weight: 500;
     border-bottom: 2px solid transparent !important;
-    color: #78909c !important;
-    padding-bottom: 0.5rem !important;
 }
 
 .stTabs [aria-selected="true"] {
-    border-bottom: 2px solid #0F52BA !important;
-    color: #0F52BA !important;
-    font-weight: 600 !important;
+    color: #3182CE !important;
+    border-bottom: 2px solid #3182CE !important;
 }
 
-/* =============================================================================
-   ALERTS & INFO BOXES
-   ============================================================================= */
-.stInfo {
-    background-color: #E3F2FD !important;
-    color: #0d47a1 !important;
-    border: none !important;
-    border-left: 4px solid #1976D2 !important;
-}
-
-.stSuccess {
-    background-color: #E8F5E9 !important;
-    color: #1b5e20 !important;
-    border: none !important;
-    border-left: 4px solid #43A047 !important;
-}
-
-.stWarning {
-    background-color: #FFF3E0 !important;
-    color: #e65100 !important;
-    border: none !important;
-    border-left: 4px solid #FB8C00 !important;
-}
-
-.stError {
-    background-color: #FFEBEE !important;
-    color: #b71c1c !important;
-    border: none !important;
-    border-left: 4px solid #D32F2F !important;
-}
-
-/* =============================================================================
-   DATAFRAME
-   ============================================================================= */
-.stDataFrame {
-    border: 1px solid #E0E0E0 !important;
-    border-radius: 4px !important;
-}
-
-/* =============================================================================
-   CUSTOM CLASSES
-   ============================================================================= */
-.subtitle {
-    font-size: 1.1rem;
-    color: #546e7a;
-    line-height: 1.6;
-}
-
-.card {
-    background: white;
-    border: 1px solid #E0E0E0;
+/* Alerts */
+.stSuccess, .stInfo, .stWarning, .stError {
+    padding: 1rem;
     border-radius: 8px;
+    border: 1px solid transparent;
+}
+.stSuccess { background: #F0FFF4 !important; border-color: #C6F6D5 !important; color: #22543D !important; }
+.stInfo { background: #EBF8FF !important; border-color: #BEE3F8 !important; color: #2A4365 !important; }
+.stWarning { background: #FFFAF0 !important; border-color: #FEEBC8 !important; color: #744210 !important; }
+.stError { background: #FFF5F5 !important; border-color: #FED7D7 !important; color: #742A2A !important; }
+
+/* Custom Classes */
+.card-box {
+    background: white;
     padding: 1.5rem;
-    height: 100%;
-    transition: transform 0.2s;
-}
-.card:hover {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    transform: translateY(-2px);
-}
-.card-title {
-    color: #0F52BA;
-    font-weight: 600;
-    font-size: 1.1rem;
-    margin-bottom: 0.5rem;
-}
-.card-text {
-    color: #546e7a;
-    font-size: 0.9rem;
+    border-radius: 8px;
+    border: 1px solid #E2E8F0;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    margin-bottom: 1rem;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
 def apply_chart_theme(fig):
-    """Applies professional light theme to charts."""
+    """Applies a clean white corporate theme to Plotly charts."""
     fig.update_layout(
         template="plotly_white",
-        font=dict(family="Inter, sans-serif", size=12, color="#2c3e50"),
-        title_font=dict(family="Inter, sans-serif", size=16, color="#1a237e", weight=600),
-        xaxis=dict(showgrid=True, gridcolor="#F0F2F5", linecolor="#CFD8DC"),
-        yaxis=dict(showgrid=True, gridcolor="#F0F2F5", linecolor="#CFD8DC"),
-        margin=dict(l=40, r=40, t=60, b=40),
-        hoverlabel=dict(bgcolor="white", font_size=12)
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Roboto, sans-serif", color="#2D3748"),
+        title_font=dict(size=18, color="#1A202C", family="Roboto, sans-serif", weight=700),
+        margin=dict(l=20, r=20, t=50, b=20),
+        xaxis=dict(showgrid=True, gridcolor="#EDF2F7", tickfont=dict(color="#718096")),
+        yaxis=dict(showgrid=True, gridcolor="#EDF2F7", tickfont=dict(color="#718096"))
     )
     return fig
