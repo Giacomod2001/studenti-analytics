@@ -129,14 +129,28 @@ def render_intervention_console():
     if not df.empty:
         df['student_id'] = df['student_id'].astype(str)
     
+    # Filter Logic Calculations (Pre-calc for UI counts)
+    if not df.empty and 'churn_percentage' in df.columns:
+        n_crit = len(df[df['churn_percentage'] >= 70])
+        n_mon = len(df[(df['churn_percentage'] >= 40) & (df['churn_percentage'] < 70)])
+        n_safe = len(df[df['churn_percentage'] < 40])
+        n_total = len(df)
+    else:
+        n_crit, n_mon, n_safe, n_total = 0, 0, 0, 0
+
     # 1. FILTER BAR
     c1, c2 = st.columns([3, 1])
     with c1:
         st.markdown("##### Risk Segment")
-        # Simplified Tiers to match SQL Model (Alto >= 70, Medio >= 40, Basso < 40)
+        # Dynamic Labels with Counts
         risk_mode = st.radio(
             "Risk Segment", 
-            ["All Students", "Critical (>70%)", "Monitor (40-70%)", "Safe (<40%)"], 
+            [
+                f"All Students ({n_total:,})", 
+                f"Critical ({n_crit:,})", 
+                f"Monitor ({n_mon:,})", 
+                f"Safe ({n_safe:,})"
+            ], 
             index=0, 
             horizontal=True, 
             label_visibility="collapsed"
@@ -146,11 +160,11 @@ def render_intervention_console():
         st.markdown("##### Actions")
         st.download_button("Export .CSV", "csv_content", "intervention_list.csv", "text/csv", use_container_width=True)
 
-    # Filter Logic - Aligned with SQL 'categoria_rischio'
+    # Filter Application
     filter_desc = "Entire Student Population"
     filtered_df = df.copy()
     
-    if not df.empty and 'churn_percentage' in df.columns:
+    if not df.empty:
         if "Critical" in risk_mode: 
             filtered_df = df[df['churn_percentage'] >= 70]
             filter_desc = "Critical Risk (>70%)"
@@ -191,15 +205,19 @@ def render_intervention_console():
             elif "Safe" in risk_mode:
                 lines.append("<p style='color: #7EE787;'><strong>Recommendation:</strong> <br>• No action needed.<br>• Consider for peer-mentorship programs.</p>")
             elif "All" in risk_mode:
-                crit_count = len(df[df['churn_percentage'] >= 70])
-                safe_count = len(df[df['churn_percentage'] < 40])
-                lines.append(f"<p><strong>Distribution:</strong> detected {crit_count:,} critical cases vs {safe_count:,} safe students.</p>")
+                lines.append(f"<p><strong>Distribution:</strong> The population is split into {n_crit:,} Critical, {n_mon:,} Monitor, and {n_safe:,} Safe cases.</p>")
 
             lines.append("</div>")
             st.markdown("\n".join(lines), unsafe_allow_html=True)
             
         else:
-            st.info("No students found in this category. Good news!")
+            # Smart Empty State
+            lines.append(f"<p>No students found in this category.</p>")
+            if "Monitor" in risk_mode and n_mon == 0:
+                 lines.append(f"<p><em>Insight:</em> The model has polarized predictions. Students are either clearly Safe ({n_safe:,}) or Critical ({n_crit:,}).</p>")
+            
+            lines.append("</div>")
+            st.markdown("\n".join(lines), unsafe_allow_html=True)
 
     with tab_grid:
         st.dataframe(
