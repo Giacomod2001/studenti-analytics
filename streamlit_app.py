@@ -320,27 +320,70 @@ def render_student_360():
 
              df_sat['psychometric_status'] = df_sat.apply(classify_sentiment, axis=1)
              
-             # Metric Summary
-             burnout_count = len(df_sat[df_sat['psychometric_status'] == "⚠️ Silent Burnout"])
+             # ─── RICH REPORT GENERATION ───
+             burnout_df = df_sat[df_sat['psychometric_status'] == "⚠️ Silent Burnout"]
+             resilient_df = df_sat[df_sat['psychometric_status'] == "⭐ Resilient"]
              
+             report_lines = []
+             report_lines.append(f"""
+             <div class="report-box">
+             <div class="report-header">🧠 Psychometric Intelligence Briefing</div>
+             """)
+             
+             # 1. Silent Burnout Analysis
+             if not burnout_df.empty:
+                 avg_gpa_burnout = burnout_df['media_voti'].mean()
+                 report_lines.append(f"""
+                 <p style='color: #FF7B72; margin-bottom: 5px;'><strong>⚠️ CRITICAL INSIGHT: Silent Burnout Detected</strong></p>
+                 <p>We identified <strong>{len(burnout_df):,} students</strong> who are academically strong (Avg GPA: {avg_gpa_burnout:.1f}) but report significantly lower satisfaction than predicted.</p>
+                 <ul style='margin-bottom: 15px;'>
+                    <li><strong>The Pattern:</strong> They perform well but are emotionally exhausted.</li>
+                    <li><strong>Risk:</strong> High probability of sudden dropout despite "good grades".</li>
+                    <li><strong>Action:</strong> Don't praise grades. Ask: <em>"How are you managing the stress?"</em></li>
+                 </ul>
+                 """)
+             
+             # 2. Resilience Analysis
+             if not resilient_df.empty:
+                 report_lines.append(f"""
+                 <p style='color: #7EE787; margin-bottom: 5px;'><strong>⭐ POSITIVE DEVIANCE: The Resilient Group</strong></p>
+                 <p>There are <strong>{len(resilient_df):,} students</strong> outperforming expectations. Despite lower academic inputs, their satisfaction is high.</p>
+                 <ul style='margin-bottom: 15px;'>
+                    <li><strong>The Opportunity:</strong> These students have high grit and school spirit.</li>
+                    <li><strong>Action:</strong> Recruit them as <strong>Peer Mentors</strong> or Student Ambassadors.</li>
+                 </ul>
+                 """)
+                 
+             if burnout_df.empty and resilient_df.empty:
+                 report_lines.append("<p>✅ The student population is psychometrically aligned. Reported satisfaction matches academic performance expectations.</p>")
+                 
+             report_lines.append("</div>")
+             st.markdown("\n".join(report_lines), unsafe_allow_html=True)
+             st.markdown("<br>", unsafe_allow_html=True)
+
+             # Metric Summary
              c1, c2 = st.columns(2)
              with c1:
                 st.metric(
                     "Potential Silent Burnouts", 
-                    f"{burnout_count:,}", 
-                    help="Students with good grades but surprisingly low satisfaction. High risk of sudden churn."
+                    f"{len(burnout_df):,}", 
+                    help="Gap < -1.5 (High Grades / Low Happiness)"
                 )
              with c2:
-                avg_sat = df_sat['soddisfazione_reale'].mean()
-                st.metric("Avg Reported Satisfaction", f"{avg_sat:.1f}/10")
+                st.metric(
+                    "Resilient Students", 
+                    f"{len(resilient_df):,}",
+                     help="Gap > 1.5 (Low Outcomes / High Happiness)"
+                )
 
         st.dataframe(
-            df_sat.head(100), 
+            df_sat.head(500), 
             use_container_width=True,
             column_config={
                 "soddisfazione_reale": st.column_config.NumberColumn("Reported Score", format="%.1f"),
                 "soddisfazione_predetta": st.column_config.NumberColumn("Expected (AI)", format="%.1f"),
                 "psychometric_status": st.column_config.TextColumn("Psychometric Profile"),
+                "media_voti": st.column_config.NumberColumn("GPA", format="%.1f"), # Added for context
                 "livello_affidabilita": None # Hide technical column
             }
         )
