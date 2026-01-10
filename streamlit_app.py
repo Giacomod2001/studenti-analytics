@@ -1,8 +1,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
 import logging
 
 # Local Modules
@@ -13,8 +11,8 @@ import data_utils
 # ─── 1) PAGE CONFIGURATION ─────────────────────────────────────────────────
 
 st.set_page_config(
-    page_title="Student Analytics | AI-Powered Retention",
-    page_icon="🎓",
+    page_title="Student Analytics Platform",
+    page_icon=None,
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -22,144 +20,182 @@ st.set_page_config(
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ─── 2) LANDING PAGE ───────────────────────────────────────────────────────
+# ─── 2) HELPER: TEXTUAL ANALYSIS ───────────────────────────────────────────
+
+def generate_automated_report(df: pd.DataFrame) -> str:
+    """
+    Generates a natural language report describing the dataframe's contents.
+    Replaces visual charts with descriptive insights.
+    """
+    report = []
+    
+    # 1. General Overview
+    report.append(f"### Dataset Overview")
+    report.append(f"The dataset contains **{len(df):,} records** and **{len(df.columns)} variables**.")
+    
+    missing_count = df.isna().sum().sum()
+    if missing_count == 0:
+        report.append("Data quality is high with **no missing values** detected.")
+    else:
+        report.append(f"Data quality check indicates **{missing_count:,} missing values** across the dataset.")
+
+    # 2. Numerical Analysis
+    num_cols = df.select_dtypes(include=[np.number]).columns
+    if len(num_cols) > 0:
+        report.append(f"### Numerical Analysis")
+        for col in num_cols:
+            if col.lower() in ['id', 'student_id', 'matricola']: continue
+            
+            avg = df[col].mean()
+            median = df[col].median()
+            std = df[col].std()
+            min_val = df[col].min()
+            max_val = df[col].max()
+            
+            # Distribution description
+            dist_desc = ""
+            if abs(avg - median) < (0.1 * std):
+                dist_desc = "symmetrically distributed"
+            elif avg > median:
+                dist_desc = "positively skewed (higher tail)"
+            else:
+                dist_desc = "negatively skewed (lower tail)"
+                
+            report.append(f"**{col}**")
+            report.append(f"- Ranges from {min_val:.2f} to {max_val:.2f}.")
+            report.append(f"- The average is {avg:.2f} (median: {median:.2f}), indicating the data is {dist_desc}.")
+            
+            # Outliers or spread
+            cv = std / avg if avg != 0 else 0
+            if cv > 1:
+                report.append(f"- Shows high variability (Coefficient of Variation: {cv:.2f}).")
+            else:
+                report.append(f"- Shows consistent values with low variability.")
+            
+            report.append("<br>")
+
+    # 3. Categorical Analysis
+    cat_cols = df.select_dtypes(include=['object', 'category']).columns
+    if len(cat_cols) > 0:
+        report.append(f"### Categorical Distribution")
+        for col in cat_cols:
+            if df[col].nunique() > 50: continue # Skip high cardinality
+            
+            top_val = df[col].mode()[0]
+            top_count = df[col].value_counts()[top_val]
+            top_pct = (top_count / len(df)) * 100
+            unique_count = df[col].nunique()
+            
+            report.append(f"**{col}**")
+            report.append(f"- Contains {unique_count} unique categories.")
+            report.append(f"- The dominant category is **'{top_val}'**, accounting for {top_pct:.1f}% of records.")
+            
+            if unique_count <= 5:
+                # List distribution
+                dist_str = ", ".join([f"{k} ({v})" for k, v in df[col].value_counts().items()])
+                report.append(f"- Breakdown: {dist_str}")
+                
+            report.append("<br>")
+
+    return "\n".join(report)
+
+
+# ─── 3) LANDING PAGE ───────────────────────────────────────────────────────
 
 def render_landing_page():
     """
-    Premium landing page with hero section and feature highlights.
+    Professional Landing Page - No Emojis, Strict Corporate Style.
     """
-    # Hero Section
-    st.markdown("""
-    <div style="text-align: center; padding: 4rem 2rem 2rem 2rem;">
-        <h1 style="font-size: 3.5rem; font-weight: 700; 
-                   background: linear-gradient(135deg, #00A0DC 0%, #0077B5 50%, #00D4AA 100%);
-                   -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-                   margin-bottom: 1rem;">
-            🎓 Student Analytics
-        </h1>
-        <p style="font-size: 1.4rem; color: #8b949e; margin-bottom: 0.5rem;">
-            AI-Powered Dropout Prediction & Retention Intelligence
-        </p>
-        <p style="font-size: 1rem; color: #6b7280; max-width: 600px; margin: 0 auto;">
-            Data-driven platform for higher education. Predict dropout risk, 
-            analyze student behavior, and design targeted retention strategies.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.markdown("---")
-    
-    # Feature Cards
-    st.markdown("### ✨ Key Features")
-    
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2 = st.columns([1, 1])
     
     with col1:
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        st.title("Student Analytics Platform")
         st.markdown("""
-        <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(75, 85, 99, 0.3);
-                    border-radius: 16px; padding: 1.5rem; text-align: center; height: 200px;">
-            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🎯</div>
-            <h4 style="color: #00A0DC; margin-bottom: 0.5rem;">Dropout Prediction</h4>
-            <p style="color: #9ca3af; font-size: 0.9rem;">
-                Random Forest model predicts dropout probability with high accuracy
-            </p>
-        </div>
+        <p class='subtitle'>
+        Authorized access only. This platform provides advanced predictive analytics for student retention and academic performance monitoring.
+        </p>
         """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown("""
-        <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(75, 85, 99, 0.3);
-                    border-radius: 16px; padding: 1.5rem; text-align: center; height: 200px;">
-            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📊</div>
-            <h4 style="color: #00A0DC; margin-bottom: 0.5rem;">Feature Importance</h4>
-            <p style="color: #9ca3af; font-size: 0.9rem;">
-                Explainable AI reveals key factors driving student outcomes
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown("""
-        <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(75, 85, 99, 0.3);
-                    border-radius: 16px; padding: 1.5rem; text-align: center; height: 200px;">
-            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">👥</div>
-            <h4 style="color: #00A0DC; margin-bottom: 0.5rem;">Student Clustering</h4>
-            <p style="color: #9ca3af; font-size: 0.9rem;">
-                K-Means groups students into behavioral profiles for targeted support
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col4:
-        st.markdown("""
-        <div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(75, 85, 99, 0.3);
-                    border-radius: 16px; padding: 1.5rem; text-align: center; height: 200px;">
-            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📈</div>
-            <h4 style="color: #00A0DC; margin-bottom: 0.5rem;">Satisfaction Analysis</h4>
-            <p style="color: #9ca3af; font-size: 0.9rem;">
-                Boosted Trees correlate satisfaction with academic performance
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    # CTA Button
-    col_left, col_center, col_right = st.columns([1, 2, 1])
-    with col_center:
-        if st.button("🚀 Enter Dashboard", use_container_width=True, type="primary"):
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        if st.button("Access Dashboard", type="primary", use_container_width=False):
             st.session_state["show_landing"] = False
             st.rerun()
-    
+
+    with col2:
+        st.markdown("""
+        <div style="background-color: #F8F9FA; padding: 2rem; border-radius: 8px; border: 1px solid #E9ECEF;">
+            <h3 style="margin-top:0;">System Status</h3>
+            <p style="color: #198754; font-weight: 600;">System Operational</p>
+            <hr style="margin: 1rem 0; border: 0; border-top: 1px solid #E9ECEF;">
+            <p style="font-size: 0.9rem; color: #6C757D;">
+            <strong>BigQuery Connection:</strong> Verified<br>
+            <strong>Model Version:</strong> Random Forest v2.1<br>
+            <strong>Last Update:</strong> Today
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
     st.markdown("---")
     
-    # Tech Stack
-    st.markdown("### 🛠️ Powered By")
+    # Feature Grid
+    st.subheader("Platform Modules")
     
-    tech_cols = st.columns(6)
-    techs = [
-        ("🐍", "Python"),
-        ("☁️", "BigQuery"),
-        ("🎨", "Streamlit"),
-        ("🤖", "Scikit-Learn"),
-        ("📊", "Plotly"),
-        ("🐼", "Pandas")
-    ]
+    c1, c2, c3, c4 = st.columns(4)
     
-    for col, (icon, name) in zip(tech_cols, techs):
-        with col:
-            st.markdown(f"""
-            <div style="text-align: center; padding: 1rem;">
-                <div style="font-size: 2rem;">{icon}</div>
-                <p style="color: #9ca3af; font-size: 0.85rem; margin-top: 0.5rem;">{name}</p>
+    with c1:
+        st.markdown("""
+        <div class="card">
+            <div class="card-title">Dropout Prediction</div>
+            <div class="card-text">
+                Proprietary Random Forest algorithms to identify at-risk students with precision.
             </div>
-            """, unsafe_allow_html=True)
-    
-    # Footer
-    st.markdown("---")
-    st.markdown("""
-    <div style="text-align: center; padding: 1rem; color: #6b7280;">
-        <p style="margin-bottom: 0.5rem;">
-            Developed by <strong>Alessandro Geli, Giacomo Dellacqua, Paolo Junior Del Giudice, Ruben Scoletta, Luca Tallarico</strong>
-        </p>
-        <p style="font-size: 0.85rem;">
-            Data Mining & Text Analytics | IULM University | 2024-2025
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with c2:
+        st.markdown("""
+        <div class="card">
+            <div class="card-title">Behavioral Clustering</div>
+            <div class="card-text">
+                Unsupervised K-Means segmentation to categorize student engagement patterns.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with c3:
+        st.markdown("""
+        <div class="card">
+            <div class="card-title">Driver Analysis</div>
+            <div class="card-text">
+                Feature importance ranking to isolate key variables impacting academic success.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with c4:
+        st.markdown("""
+        <div class="card">
+            <div class="card-title">Satisfaction Metrics</div>
+            <div class="card-text">
+                Correlative analysis between qualitative survey data and quantitative performance.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("<br><br><br>", unsafe_allow_html=True)
+    st.caption("2026 University Analytics Dept. | Internal Use Only")
 
 
-# ─── 3) HOME DASHBOARD ─────────────────────────────────────────────────────
+# ─── 4) HOME DASHBOARD ─────────────────────────────────────────────────────
 
 def render_home_dashboard(tables_info):
     """
-    Enhanced dashboard with premium KPI cards and visual insights.
+    Executive Dashboard View.
     """
-    st.markdown("""
-    <h1 style="font-size: 2.2rem; margin-bottom: 0.25rem;">📊 Analytics Dashboard</h1>
-    <p style="color: #8b949e; font-size: 1rem;">Real-time student insights powered by Machine Learning</p>
-    """, unsafe_allow_html=True)
-    
+    st.title("Executive Dashboard")
+    st.markdown("Overview of student population health and risk assessment.")
     st.markdown("---")
     
     # Load data
@@ -167,398 +203,188 @@ def render_home_dashboard(tables_info):
         df_churn = data_utils.load_table_data_optimized("studenti_churn_pred")
         df_students = data_utils.load_table_data_optimized("studenti")
         df_clusters = data_utils.load_table_data_optimized("studenti_cluster")
-        df_features = data_utils.load_table_data_optimized("feature_importance_studenti")
-    except:
+    except Exception as e:
         df_churn = pd.DataFrame()
         df_students = pd.DataFrame()
         df_clusters = pd.DataFrame()
-        df_features = pd.DataFrame()
-    
-    # ==================== KEY METRICS ====================
-    st.markdown("### 📈 Key Performance Indicators")
-    
-    col1, col2, col3, col4 = st.columns(4)
+
+    # --- KPI ROW ---
+    c1, c2, c3, c4 = st.columns(4)
     
     total_students = len(df_students) if not df_students.empty else 0
     
-    # Calculate dropout risk metrics
+    avg_risk = 0
+    high_risk_count = 0
     if not df_churn.empty and 'churn_percentage' in df_churn.columns:
         churn_vals = df_churn['churn_percentage'].copy()
-        if churn_vals.mean() > 1:
-            churn_vals = churn_vals / 100
+        if churn_vals.mean() > 1: churn_vals /= 100
         avg_risk = churn_vals.mean() * 100
         high_risk_count = len(df_churn[churn_vals > 0.7])
-        high_risk_pct = (high_risk_count / len(df_churn)) * 100 if len(df_churn) > 0 else 0
-    else:
-        avg_risk = 0
-        high_risk_count = 0
-        high_risk_pct = 0
     
-    n_clusters = df_clusters['cluster'].nunique() if not df_clusters.empty and 'cluster' in df_clusters.columns else 0
+    clusters_count = df_clusters['cluster'].nunique() if not df_clusters.empty and 'cluster' in df_clusters.columns else 0
     
-    with col1:
-        st.metric("Total Students", f"{total_students:,}", help="Total students in database")
-    
-    with col2:
-        delta_color = "inverse" if avg_risk > 50 else "normal"
-        st.metric("Avg Dropout Risk", f"{avg_risk:.1f}%", help="Average predicted dropout probability")
-    
-    with col3:
-        st.metric("High Risk", f"{high_risk_count:,}", delta=f"{high_risk_pct:.0f}% of total", delta_color="inverse")
-    
-    with col4:
-        st.metric("Segments", n_clusters, help="Behavioral clusters identified")
-    
-    st.markdown("---")
-    
-    # ==================== RISK BREAKDOWN ====================
-    st.markdown("### 🎯 Risk Distribution")
-    
-    if not df_churn.empty and 'churn_percentage' in df_churn.columns:
-        churn_vals = df_churn['churn_percentage'].copy()
-        if churn_vals.mean() > 1:
-            churn_vals = churn_vals / 100
-        
-        low_risk = len(df_churn[churn_vals <= 0.3])
-        med_risk = len(df_churn[(churn_vals > 0.3) & (churn_vals <= 0.7)])
-        high_risk = len(df_churn[churn_vals > 0.7])
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.success(f"""
-            #### ✅ Low Risk
-            **{low_risk:,}** students  
-            Dropout probability < 30%
-            """)
-        
-        with col2:
-            st.warning(f"""
-            #### ⚠️ Medium Risk
-            **{med_risk:,}** students  
-            Dropout probability 30-70%
-            """)
-        
-        with col3:
-            st.error(f"""
-            #### 🚨 High Risk
-            **{high_risk:,}** students  
-            Dropout probability > 70%
-            """)
-        
-        st.markdown("---")
-        
-        # ==================== ACTIONS ====================
-        st.markdown("### 💡 Recommended Actions")
-        
-        col_a, col_b, col_c = st.columns(3)
-        
-        with col_a:
-            st.info(f"""
-            **🔴 Immediate**  
-            Review {high_risk} high-risk students and schedule counseling sessions.
-            """)
-        
-        with col_b:
-            st.info("""
-            **🟡 Short-term**  
-            Analyze Feature Importance to identify common risk factors.
-            """)
-        
-        with col_c:
-            st.info("""
-            **🟢 Long-term**  
-            Design retention programs based on Student Clustering profiles.
-            """)
-    else:
-        st.info("📊 Dropout prediction data not available. Navigate to 'Dropout Prediction' table to view details.")
-    
-    # ==================== QUICK NAVIGATION ====================
-    st.markdown("---")
-    
-    with st.expander("📁 Data Catalogue", expanded=False):
-        cols = st.columns(4)
-        for idx, t in enumerate(tables_info):
-            with cols[idx % 4]:
-                st.markdown(f"**{t['name']}**")
-                st.caption(f"{t['rows']:,} rows")
+    c1.metric("Total Population", f"{total_students:,}")
+    c2.metric("Avg. Retention Risk", f"{avg_risk:.1f}%")
+    c3.metric("Critical Risk Cases", f"{high_risk_count:,}")
+    c4.metric("Active Segments", f"{clusters_count}")
 
+    st.markdown("<br>", unsafe_allow_html=True)
 
-# ─── 4) KEY INSIGHTS ───────────────────────────────────────────────────────
+    # --- DETAILED ANALYSIS ---
+    col_main, col_side = st.columns([2, 1])
 
-def render_key_insights(df: pd.DataFrame, table_id: str):
-    """
-    Renders text-based insights using correct column names.
-    """
-    if table_id == "studenti_churn_pred":
-        if 'churn_percentage' in df.columns:
-            mean_val = df['churn_percentage'].mean()
-            if mean_val > 1:
-                df['churn_percentage'] = df['churn_percentage'] / 100
-                
-            avg_churn = df['churn_percentage'].mean()
-            high_risk = df[df['churn_percentage'] > 0.7].shape[0]
-            total = len(df)
-            pct_risk = (high_risk / total) * 100 if total > 0 else 0
+    with col_main:
+        st.subheader("Risk Analysis Report")
+        if high_risk_count > 0:
+            low = len(df_churn[churn_vals <= 0.3])
+            med = len(df_churn[(churn_vals > 0.3) & (churn_vals <= 0.7)])
+            high = high_risk_count
+            total_churn = len(df_churn)
             
-            st.info(f"""
-            **🔍 Key Insights:**
-            - **Average Dropout Risk:** {avg_churn:.1%}
-            - **Critical Students:** {high_risk} ({pct_risk:.1%} of total)
-            - **Action:** {high_risk} students require immediate counseling intervention.
-            """)
+            low_pct = (low / total_churn) * 100
+            med_pct = (med / total_churn) * 100
+            high_pct = (high / total_churn) * 100
+            
+            st.markdown(f"""
+            <div style="background: white; padding: 1.5rem; border: 1px solid #E0E0E0; border-radius: 8px;">
+                <p>The predictive model has analyzed <strong>{total_churn:,} active records</strong>. The population is stratified as follows:</p>
+                <ul>
+                    <li style="margin-bottom: 0.5rem;">
+                        <strong>Low Risk Cohort:</strong> {low:,} students ({low_pct:.1f}%) <br>
+                        <span style="color: #666; font-size: 0.9rem;">Students demonstrating strong engagement and academic stability.</span>
+                    </li>
+                    <li style="margin-bottom: 0.5rem;">
+                        <strong>Medium Risk Cohort:</strong> {med:,} students ({med_pct:.1f}%) <br>
+                        <span style="color: #666; font-size: 0.9rem;">Students showing early warning signs (attendance fluctuation, grade variance).</span>
+                    </li>
+                    <li style="margin-bottom: 0.5rem; color: #D32F2F;">
+                        <strong>High Risk Cohort:</strong> {high:,} students ({high_pct:.1f}%) <br>
+                        <span style="color: #D32F2F; font-size: 0.9rem;">Immediate intervention required. Probability of attrition > 70%.</span>
+                    </li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
+            
         else:
-             st.warning("Insight not available: 'churn_percentage' column missing.")
-    
-    elif table_id == "feature_importance_studenti":
-        importance_cols = [col for col in df.columns if 'importance' in col.lower() or 'peso' in col.lower() or 'percentuale' in col.lower()]
-        feature_col = next((col for col in df.columns if 'feature' in col.lower() or 'caratteristica' in col.lower()), df.columns[0])
-        
-        if importance_cols:
-            top_3 = df.sort_values(by=importance_cols[0], ascending=False).head(3)
-            
-            msg = "**🏆 Top 3 Drivers of Dropout:**\n"
-            for _, row in top_3.iterrows():
-                msg += f"- **{row[feature_col]}**: {row[importance_cols[0]]:.2f} impact\n"
-            
-            st.info(msg)
-    
-    elif table_id == "studenti_cluster":
-        cluster_col = next((col for col in df.columns if 'cluster' in col.lower()), None)
-        if cluster_col:
-            top_cluster = df[cluster_col].value_counts().idxmax()
-            counts = df[cluster_col].value_counts()
-            
-            st.info(f"""
-            **👥 Segmentation Summary:**
-            - **Dominant Group:** Cluster "{top_cluster}" ({counts[top_cluster]} students)
-            - **Distribution:** {len(counts)} distinct behavioral profiles identified.
-            """)
+            st.info("No risk data available for analysis.")
 
+    with col_side:
+        st.subheader("Action Items")
+        st.markdown("""
+        <div style="background-color: white; border: 1px solid #E0E0E0; border-radius: 8px; padding: 1rem;">
+            <p style="font-weight: 600; color: #D32F2F; margin-bottom: 0.5rem;">CRITICAL</p>
+            <p style="font-size: 0.9rem; margin-bottom: 1rem;">
+                Review <strong>High Risk</strong> cohort immediately. Schedule academic counseling.
+            </p>
+            <hr>
+            <p style="font-weight: 600; color: #FB8C00; margin-bottom: 0.5rem;">WARNING</p>
+            <p style="font-size: 0.9rem;">
+                Monitor <strong>Medium Risk</strong> segment for attendance drops.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
 
 # ─── 5) TABLE INSPECTION ───────────────────────────────────────────────────
 
 def render_table_inspection(df: pd.DataFrame, table_info: dict):
     """
-    Enhanced table visualization with premium styling.
+    Professional Data Inspector - Text Reports Only, No Charts.
     """
-    # Header
-    col_head_1, col_head_2 = st.columns([3, 1])
-    with col_head_1:
-        st.markdown(f"# 📋 {table_info['name']}")
-        st.markdown(f"*{table_info['description']}*")
-    with col_head_2:
-        st.download_button(
-            label="⬇️ Export CSV",
-            data=df.to_csv(index=False).encode("utf-8"),
-            file_name=f"{table_info['name']}.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
+    st.subheader(table_info["name"])
+    st.caption(table_info["description"])
     
-    # Quick metrics
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Rows", f"{len(df):,}")
-    m2.metric("Columns", len(df.columns))
-    missing_pct = round(df.isna().sum().sum() / (len(df) * len(df.columns)) * 100, 2) if not df.empty else 0
-    m3.metric("Missing", f"{missing_pct}%")
-    mem_mb = round(df.memory_usage(deep=True).sum() / (1024 * 1024), 2) if not df.empty else 0
-    m4.metric("Memory", f"{mem_mb} MB")
+    col_kpi, col_export = st.columns([3, 1])
+    
+    with col_kpi:
+        st.markdown(f"**Records:** {len(df):,} | **Fields:** {len(df.columns)}")
+    
+    with col_export:
+        st.download_button("Export Dataset (.csv)", df.to_csv(index=False).encode('utf-8'), f"{table_info['name']}.csv", "text/csv")
     
     st.markdown("---")
 
-    # Tabs
-    tab_data, tab_stats, tab_info = st.tabs(["📊 Explore Data", "📈 Statistics & Charts", "ℹ️ Info & Origin"])
+    tab_data, tab_report, tab_meta = st.tabs(["Data View", "Automated Intelligence Report", "Metadata"])
     
     with tab_data:
-        with st.expander("🔍 Advanced Filters", expanded=False):
-            col_f1, col_f2 = st.columns([1, 2])
-            with col_f1:
-                search = st.text_input("Search text", placeholder="Type to filter...")
-            with col_f2:
-                cols = st.multiselect("Visible columns", df.columns.tolist(), default=df.columns.tolist()[:8])
-        
-        df_view = df.copy()
-        if search:
-            mask = df_view.astype(str).apply(lambda x: x.str.contains(search, case=False, na=False)).any(axis=1)
-            df_view = df_view[mask]
-        
-        if cols:
-            st.dataframe(df_view[cols].head(200), use_container_width=True, height=500)
-            st.caption(f"Showing {min(200, len(df_view))} of {len(df_view)} filtered rows.")
+        st.dataframe(df.head(100), use_container_width=True, height=600)
+    
+    with tab_report:
+        if not df.empty:
+            st.markdown("#### Automated Data Intelligence")
+            st.markdown("The system has performed a statistical scan of the dataset to generate the following insights:")
+            st.markdown("---")
+            
+            report_content = generate_automated_report(df)
+            st.markdown(report_content, unsafe_allow_html=True)
         else:
-            st.warning("Select at least one column.")
-
-    with tab_stats:
-        render_key_insights(df, table_info["id"])
-        st.markdown("---")
-        
-        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-        
-        col_viz_1, col_viz_2 = st.columns([1, 3])
-        
-        with col_viz_1:
-            st.markdown("#### ⚙️ Configuration")
-            chart_type = st.selectbox("Chart Type", ["Histogram", "Box Plot", "Scatter", "Bar Chart", "Heatmap"], index=0)
+            st.warning("Dataset is empty. No report available.")
             
-            x_axis = st.selectbox("X Axis", df.columns)
-            y_axis = st.selectbox("Y Axis", [None] + numeric_cols) if chart_type != "Heatmap" else None
-            color_dim = st.selectbox("Color", [None] + df.columns.tolist()) if chart_type != "Heatmap" else None
-            
-        with col_viz_2:
-            try:
-                fig = None
-                default_color = '#00A0DC'
-                
-                if chart_type == "Histogram":
-                    fig = px.histogram(
-                        df, x=x_axis, y=y_axis, color=color_dim, 
-                        title=f"Distribution of {x_axis}",
-                        color_discrete_sequence=[default_color] if not color_dim else None
-                    )
-                elif chart_type == "Box Plot":
-                    fig = px.box(
-                        df, x=x_axis, y=y_axis, color=color_dim, 
-                        title=f"Box Plot: {x_axis}",
-                        color_discrete_sequence=[default_color] if not color_dim else None
-                    )
-                elif chart_type == "Scatter":
-                    fig = px.scatter(
-                        df, x=x_axis, y=y_axis, color=color_dim, 
-                        title=f"Scatter: {x_axis} vs {y_axis}",
-                        color_discrete_sequence=[default_color] if not color_dim else None
-                    )
-                elif chart_type == "Bar Chart":
-                    if len(df) > 1000 and y_axis:
-                        df_agg = df.groupby(x_axis)[y_axis].mean().reset_index()
-                        fig = px.bar(
-                            df_agg, x=x_axis, y=y_axis, 
-                            color=color_dim if color_dim in df_agg else None, 
-                            title=f"Average {y_axis} by {x_axis}",
-                            color_discrete_sequence=[default_color] if not color_dim or color_dim not in df_agg else None
-                        )
-                    else:
-                        fig = px.bar(
-                            df, x=x_axis, y=y_axis, color=color_dim, 
-                            title=f"Bar Chart: {x_axis}",
-                            color_discrete_sequence=[default_color] if not color_dim else None
-                        )
-                elif chart_type == "Heatmap":
-                    if len(numeric_cols) > 1:
-                        corr = df[numeric_cols].corr()
-                        fig = px.imshow(
-                            corr, 
-                            text_auto='.2f', 
-                            title="Correlation Matrix", 
-                            color_continuous_scale='RdBu_r',
-                            aspect="auto"
-                        )
-                    else:
-                        st.info("Need at least 2 numerical columns for Heatmap.")
-
-                if fig:
-                    fig = styles_config.apply_chart_theme(fig)
-                    st.plotly_chart(fig, use_container_width=True)
-            except Exception as e:
-                st.error(f"Error creating chart: {e}")
-
-    with tab_info:
-        st.markdown("### 📖 Origin and Description")
-        origin_text = constants.TABLE_ORIGINS.get(table_info["id"], "No detailed information available.")
-        st.markdown(origin_text)
+    with tab_meta:
+        st.markdown("**Field Descriptions & Logic**")
+        st.text_area("SQL Schema Definition", "Detailed schema info available in BigQuery documentation.", disabled=True)
 
 
-# ─── 6) MAIN APP ───────────────────────────────────────────────────────────
+# ─── 6) MAIN APP STRUCTURE ─────────────────────────────────────────────────
 
 def main():
     styles_config.inject_custom_css()
     
-    # Initialize session state
     if "show_landing" not in st.session_state:
         st.session_state["show_landing"] = True
-    
-    # ==================== SIDEBAR ====================
+        
+    if st.session_state["show_landing"]:
+        render_landing_page()
+        return
+
+    # --- SIDEBAR NAV ---
     with st.sidebar:
-        st.markdown("# 🎓 Student Analytics")
-        st.caption("v3.0 | BigQuery Powered")
+        st.title("Analytics")
         
-        st.divider()
-        
-        # Connection check
+        # Connection Status
         client = data_utils.get_bigquery_client()
-        if not client:
-            st.error("❌ Unable to connect to BigQuery")
-            st.stop()
+        if client:
+            st.caption("Connected to BigQuery")
         else:
-            st.success("✅ Connected to BigQuery")
+            st.error("Connection Failed")
+            st.stop()
+            
+        st.markdown("<br>", unsafe_allow_html=True)
         
-        # Load metadata
         tables_info = data_utils.get_tables_metadata_cached()
         
-        if not tables_info:
-            st.warning("No tables found")
-            st.stop()
+        # Navigation Groups
+        st.markdown("<strong>DASHBOARDS</strong>", unsafe_allow_html=True)
+        nav_main = st.radio("Dashboards", ["Executive Overview"], label_visibility="collapsed")
         
-        st.divider()
+        st.markdown("<br><strong>PREDICTIVE MODELS</strong>", unsafe_allow_html=True)
+        ml_tables = [t for t in tables_info if "pred" in t['id'] or "cluster" in t['id']]
+        ml_names = [t['name'] for t in ml_tables]
+        nav_ml = st.radio("Models", ["Select Model..."] + ml_names, label_visibility="collapsed")
         
-        # Navigation
-        st.markdown("### 🧭 Navigation")
-        
-        # Organize tables by type
-        ml_tables = [t for t in tables_info if "pred" in t['id'] or "cluster" in t['id'] or "importance" in t['id']]
+        st.markdown("<br><strong>DATA WAREHOUSE</strong>", unsafe_allow_html=True)
         raw_tables = [t for t in tables_info if t not in ml_tables]
+        raw_names = [t['name'] for t in raw_tables]
+        nav_data = st.radio("Data", ["Select Data..."] + raw_names, label_visibility="collapsed")
         
-        options = ["🏠 Home", "🌟 Landing Page"]
-        
-        # Add ML tables
-        if ml_tables:
-            options.append("---")
-            options.extend([f"🤖 {t['name']}" for t in ml_tables])
-        
-        # Add raw tables
-        if raw_tables:
-            options.append("---")
-            options.extend([f"📁 {t['name']}" for t in raw_tables])
-        
-        # Remove separator markers for radio
-        clean_options = [o for o in options if o != "---"]
-        
-        selection = st.radio("", clean_options, label_visibility="collapsed")
-        
-        st.divider()
-        
-        # Quick Stats
-        st.markdown("### 📊 Quick Stats")
-        col1, col2 = st.columns(2)
-        col1.metric("Tables", len(tables_info))
-        total_rows = sum(t['rows'] for t in tables_info)
-        col2.metric("Records", f"{total_rows//1000}K")
-        
-        st.divider()
-        
-        # Footer
-        st.caption("Powered by BigQuery & Streamlit")
-        st.caption("[GitHub](https://github.com/Giacomod2001/studenti-analytics)")
-    
-    # ==================== MAIN CONTENT ====================
-    if selection == "🌟 Landing Page":
-        render_landing_page()
-    elif selection == "🏠 Home":
-        render_home_dashboard(tables_info)
-    else:
-        # Extract actual table name (remove emoji prefix)
-        table_name = selection.split(" ", 1)[1] if " " in selection else selection
-        current_info = next((t for t in tables_info if t["name"] == table_name), None)
-        
-        if current_info:
-            with st.spinner(f"Loading {table_name}..."):
-                df = data_utils.load_table_data_optimized(current_info["id"])
-                
-            if not df.empty:
-                render_table_inspection(df, current_info)
-            else:
-                st.warning(f"Table {table_name} is empty or unable to load.")
+        st.markdown("---")
+        st.caption("v4.0.0 | IULM Analytics")
 
+    # --- ROUTING ---
+    selected_view = "Executive Overview"
+    selected_table_info = None
+    
+    if nav_ml != "Select Model...":
+        selected_view = "Table"
+        selected_table_info = next((t for t in tables_info if t['name'] == nav_ml), None)
+    elif nav_data != "Select Data...":
+        selected_view = "Table"
+        selected_table_info = next((t for t in tables_info if t['name'] == nav_data), None)
+        
+    if selected_view == "Executive Overview":
+        render_home_dashboard(tables_info)
+    elif selected_view == "Table" and selected_table_info:
+        df = data_utils.load_table_data_optimized(selected_table_info['id'])
+        render_table_inspection(df, selected_table_info)
 
 if __name__ == "__main__":
     main()

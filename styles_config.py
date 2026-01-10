@@ -1,435 +1,253 @@
 # =============================================================================
-# STYLES_CONFIG.PY - Premium Visual Design for Student Analytics
-# Version 3.0 - Based on datamining_git template
+# STYLES_CONFIG.PY - Professional Corporate Design
+# Version 4.0 - Clean, Minimalist, No Emojis
 # =============================================================================
 
 import streamlit as st
 
 def inject_custom_css():
-    """Injects premium CSS theme with Google Fonts, glassmorphism, and animations."""
+    """Injects professional CSS theme."""
     st.markdown("""
 <style>
 /* =============================================================================
-   GOOGLE FONTS
+   FONTS & GLOBAL VARS
    ============================================================================= */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-* {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+:root {
+    --primary-color: #0F52BA; /* Sapphire Blue - Professional */
+    --secondary-color: #E1E8ED;
+    --background-color: #F5F7F9; /* Very light gray for corporate feel */
+    --text-color: #2c3e50;
+    --card-bg: white;
 }
 
-h1, h2, h3, .stTitle {
-    font-family: 'Outfit', sans-serif !important;
+* {
+    font-family: 'Inter', sans-serif !important;
 }
 
 /* =============================================================================
-   SIDEBAR STYLING - Premium Dark
+   SIDEBAR - Clean & Structured
    ============================================================================= */
 section[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #0f1419 0%, #1a1f2e 50%, #0f1419 100%);
-    border-right: 1px solid rgba(0, 160, 220, 0.2);
+    background-color: #FAFAFA;
+    border-right: 1px solid #E0E0E0;
 }
 
-section[data-testid="stSidebar"] > div:first-child {
-    padding: 1.5rem 1.5rem;
-}
-
-/* Sidebar Title */
 section[data-testid="stSidebar"] h1 {
-    color: #00A0DC !important;
-    font-size: 1.6rem !important;
+    color: #1a237e !important;
+    font-size: 1.4rem !important;
     font-weight: 700 !important;
-    margin-bottom: 0.5rem !important;
+    border-bottom: 2px solid #0F52BA;
     padding-bottom: 1rem;
-    border-bottom: 2px solid rgba(0, 160, 220, 0.3);
-    text-shadow: 0 0 20px rgba(0, 160, 220, 0.3);
+    margin-bottom: 2rem !important;
 }
 
-/* Sidebar Section Headers */
-section[data-testid="stSidebar"] h3 {
-    color: #8b949e !important;
-    font-size: 0.75rem !important;
-    font-weight: 600 !important;
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    margin-top: 1.5rem !important;
-    margin-bottom: 0.75rem !important;
-}
-
-/* Radio buttons - Premium Style */
+/* Sidebar Navigation Items */
 section[data-testid="stSidebar"] .stRadio > div > label {
-    background: rgba(30, 41, 59, 0.5) !important;
-    border: 1px solid rgba(75, 85, 99, 0.3) !important;
-    border-radius: 10px !important;
-    padding: 0.75rem 1rem !important;
-    margin: 0.25rem 0 !important;
-    transition: all 0.3s ease !important;
-    color: #e0e6ed !important;
+    background: transparent !important;
+    color: #455a64 !important;
+    border: none !important;
+    padding: 0.6rem 1rem !important;
+    font-weight: 500 !important;
+    border-left: 3px solid transparent !important;
+    transition: all 0.2s ease;
 }
 
 section[data-testid="stSidebar"] .stRadio > div > label:hover {
-    background: rgba(0, 160, 220, 0.15) !important;
-    border-color: #00A0DC !important;
-    transform: translateX(4px);
+    background: #F0F4F8 !important;
+    color: #0F52BA !important;
+    border-left: 3px solid #0F52BA !important;
 }
 
 section[data-testid="stSidebar"] .stRadio > div > label[data-checked="true"] {
-    background: linear-gradient(135deg, #0077B5 0%, #00A0DC 100%) !important;
-    border-color: transparent !important;
-    box-shadow: 0 4px 15px rgba(0, 160, 220, 0.3) !important;
-}
-
-/* =============================================================================
-   MAIN CONTENT STYLING
-   ============================================================================= */
-   
-/* Page background */
-.stApp {
-    background: linear-gradient(135deg, #0f1419 0%, #1a1f2e 50%, #0f1419 100%);
-}
-
-/* Main title */
-h1 {
-    color: #f0f6fc !important;
-    font-weight: 700 !important;
-    letter-spacing: -0.5px;
-}
-
-h2 {
-    color: #e0e6ed !important;
+    background: #E3F2FD !important;
+    color: #0F52BA !important;
     font-weight: 600 !important;
-    border-bottom: 2px solid rgba(0, 160, 220, 0.2);
-    padding-bottom: 0.5rem;
-}
-
-h3 {
-    color: #c9d1d9 !important;
-    font-weight: 500 !important;
+    border-left: 3px solid #0F52BA !important;
 }
 
 /* =============================================================================
-   METRICS - KPI CARDS
+   MAIN AREA
    ============================================================================= */
+.stApp {
+    background-color: #FFFFFF;
+}
+
+h1, h2, h3 {
+    color: #1a237e !important;
+    font-weight: 600 !important;
+}
+
+h1 { font-size: 2.2rem !important; margin-bottom: 1rem !important; }
+h2 { font-size: 1.6rem !important; margin-top: 2rem !important; }
+h3 { font-size: 1.2rem !important; color: #455a64 !important; }
+
+/* =============================================================================
+   CARDS & CONTAINERS (KPIs, Features)
+   ============================================================================= */
+.css-1r6slb0, .css-12w0qpk { /* Streamlit metric containers placeholders */
+    background: white;
+    border: 1px solid #E0E0E0;
+    border-radius: 8px;
+    padding: 1rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
 [data-testid="stMetric"] {
-    background: rgba(30, 41, 59, 0.6);
-    border: 1px solid rgba(75, 85, 99, 0.3);
-    border-radius: 16px;
-    padding: 1.25rem !important;
-    transition: all 0.3s ease;
-}
-
-[data-testid="stMetric"]:hover {
-    border-color: #00A0DC;
-    box-shadow: 0 0 20px rgba(0, 160, 220, 0.2);
-    transform: translateY(-2px);
-}
-
-[data-testid="stMetricValue"] {
-    font-size: 2.2rem !important;
-    font-weight: 700 !important;
-    color: #00A0DC !important;
-    font-family: 'Outfit', sans-serif !important;
+    background-color: #FFFFFF;
+    border: 1px solid #E0E0E0;
+    padding: 1.5rem !important;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
 }
 
 [data-testid="stMetricLabel"] {
-    color: #8b949e !important;
-    font-size: 0.85rem !important;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    font-size: 0.9rem !important;
+    color: #78909c !important;
+    font-weight: 500 !important;
 }
 
-[data-testid="stMetricDelta"] {
-    font-size: 0.9rem !important;
+[data-testid="stMetricValue"] {
+    font-size: 2rem !important;
+    color: #1a237e !important;
+    font-weight: 700 !important;
 }
 
 /* =============================================================================
-   BUTTONS - Premium with Animations
+   BUTTONS
    ============================================================================= */
 .stButton > button {
-    background: linear-gradient(135deg, #0077B5 0%, #00A0DC 100%) !important;
+    background: #0F52BA !important;
     color: white !important;
+    border-radius: 6px !important;
     border: none !important;
-    border-radius: 10px !important;
-    padding: 0.75rem 2rem !important;
+    padding: 0.6rem 1.5rem !important;
     font-weight: 600 !important;
-    font-size: 0.95rem !important;
-    transition: all 0.3s ease !important;
-    box-shadow: 0 4px 15px rgba(0, 119, 181, 0.3) !important;
+    box-shadow: 0 2px 4px rgba(15, 82, 186, 0.2) !important;
+    transition: background 0.2s ease !important;
 }
 
 .stButton > button:hover {
-    transform: translateY(-3px) !important;
-    box-shadow: 0 8px 25px rgba(0, 160, 220, 0.4) !important;
+    background: #0a3d8f !important;
 }
 
-.stButton > button:active {
-    transform: translateY(-1px) !important;
-}
-
-/* Secondary button style */
 .stDownloadButton > button {
-    background: rgba(30, 41, 59, 0.8) !important;
-    border: 1px solid #00A0DC !important;
-    color: #00A0DC !important;
+    background: white !important;
+    border: 1px solid #0F52BA !important;
+    color: #0F52BA !important;
 }
 
 .stDownloadButton > button:hover {
-    background: linear-gradient(135deg, #0077B5 0%, #00A0DC 100%) !important;
-    color: white !important;
+    background: #F0F4F8 !important;
 }
 
 /* =============================================================================
-   TABS - Modern Style
+   TABS
    ============================================================================= */
 .stTabs [data-baseweb="tab-list"] {
-    background: rgba(30, 41, 59, 0.5);
-    padding: 6px;
-    border-radius: 12px;
-    gap: 6px;
+    background: transparent;
+    border-bottom: 1px solid #E0E0E0;
+    gap: 2rem;
 }
 
 .stTabs [data-baseweb="tab"] {
-    border-radius: 8px !important;
-    padding: 10px 20px !important;
-    color: #9ca3af !important;
-    font-weight: 500 !important;
-    transition: all 0.2s ease !important;
-}
-
-.stTabs [data-baseweb="tab"]:hover {
-    color: #f0f6fc !important;
-    background: rgba(0, 160, 220, 0.15) !important;
+    background: transparent !important;
+    border: none !important;
+    border-bottom: 2px solid transparent !important;
+    color: #78909c !important;
+    padding-bottom: 0.5rem !important;
 }
 
 .stTabs [aria-selected="true"] {
-    background: linear-gradient(135deg, #0077B5 0%, #00A0DC 100%) !important;
-    color: white !important;
-    box-shadow: 0 2px 10px rgba(0, 160, 220, 0.3) !important;
+    border-bottom: 2px solid #0F52BA !important;
+    color: #0F52BA !important;
+    font-weight: 600 !important;
 }
 
 /* =============================================================================
-   EXPANDERS - Glassmorphism
+   ALERTS & INFO BOXES
    ============================================================================= */
-.streamlit-expanderHeader {
-    background: rgba(30, 41, 59, 0.6) !important;
-    border: 1px solid rgba(75, 85, 99, 0.3) !important;
-    border-radius: 12px !important;
-    color: #f0f6fc !important;
-    font-weight: 500 !important;
-    transition: all 0.2s ease !important;
+.stInfo {
+    background-color: #E3F2FD !important;
+    color: #0d47a1 !important;
+    border: none !important;
+    border-left: 4px solid #1976D2 !important;
 }
 
-.streamlit-expanderHeader:hover {
-    border-color: #00A0DC !important;
-    background: rgba(30, 41, 59, 0.8) !important;
-}
-
-/* =============================================================================
-   DATAFRAMES - Styled Tables
-   ============================================================================= */
-.stDataFrame {
-    border-radius: 12px !important;
-    overflow: hidden;
-}
-
-.stDataFrame [data-testid="stDataFrameResizable"] {
-    border: 1px solid rgba(75, 85, 99, 0.3) !important;
-    border-radius: 12px !important;
-}
-
-/* =============================================================================
-   ALERTS - Risk Colors
-   ============================================================================= */
 .stSuccess {
-    background: rgba(16, 185, 129, 0.15) !important;
-    border-left: 4px solid #10B981 !important;
-    border-radius: 8px !important;
+    background-color: #E8F5E9 !important;
+    color: #1b5e20 !important;
+    border: none !important;
+    border-left: 4px solid #43A047 !important;
 }
 
 .stWarning {
-    background: rgba(245, 158, 11, 0.15) !important;
-    border-left: 4px solid #F59E0B !important;
-    border-radius: 8px !important;
+    background-color: #FFF3E0 !important;
+    color: #e65100 !important;
+    border: none !important;
+    border-left: 4px solid #FB8C00 !important;
 }
 
 .stError {
-    background: rgba(239, 68, 68, 0.15) !important;
-    border-left: 4px solid #EF4444 !important;
-    border-radius: 8px !important;
-}
-
-.stInfo {
-    background: rgba(0, 160, 220, 0.15) !important;
-    border-left: 4px solid #00A0DC !important;
-    border-radius: 8px !important;
-}
-
-/* =============================================================================
-   DIVIDERS
-   ============================================================================= */
-hr {
+    background-color: #FFEBEE !important;
+    color: #b71c1c !important;
     border: none !important;
-    height: 1px !important;
-    background: linear-gradient(90deg, transparent, rgba(0, 160, 220, 0.3), transparent) !important;
-    margin: 2rem 0 !important;
+    border-left: 4px solid #D32F2F !important;
 }
 
 /* =============================================================================
-   SELECTBOX & INPUTS
+   DATAFRAME
    ============================================================================= */
-.stSelectbox > div > div {
-    background: rgba(30, 41, 59, 0.6) !important;
-    border: 1px solid rgba(75, 85, 99, 0.3) !important;
-    border-radius: 10px !important;
-    color: #f0f6fc !important;
-}
-
-.stTextInput > div > div > input {
-    background: rgba(30, 41, 59, 0.6) !important;
-    border: 1px solid rgba(75, 85, 99, 0.3) !important;
-    border-radius: 10px !important;
-    color: #f0f6fc !important;
-}
-
-.stTextInput > div > div > input:focus {
-    border-color: #00A0DC !important;
-    box-shadow: 0 0 0 2px rgba(0, 160, 220, 0.2) !important;
+.stDataFrame {
+    border: 1px solid #E0E0E0 !important;
+    border-radius: 4px !important;
 }
 
 /* =============================================================================
-   SCROLLBAR
+   CUSTOM CLASSES
    ============================================================================= */
-::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+.subtitle {
+    font-size: 1.1rem;
+    color: #546e7a;
+    line-height: 1.6;
 }
 
-::-webkit-scrollbar-track {
-    background: rgba(30, 41, 59, 0.3);
-    border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb {
-    background: rgba(0, 160, 220, 0.5);
-    border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: #00A0DC;
-}
-
-/* =============================================================================
-   CAPTION
-   ============================================================================= */
-.stCaption {
-    color: #6b7280 !important;
-}
-
-/* =============================================================================
-   LANDING PAGE SPECIFIC
-   ============================================================================= */
-.hero-title {
-    font-size: 3.5rem !important;
-    font-weight: 700 !important;
-    background: linear-gradient(135deg, #00A0DC 0%, #0077B5 50%, #00D4AA 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    text-align: center;
-    margin-bottom: 1rem;
-}
-
-.hero-subtitle {
-    font-size: 1.3rem;
-    color: #8b949e;
-    text-align: center;
-    margin-bottom: 2rem;
-}
-
-.feature-card {
-    background: rgba(30, 41, 59, 0.6);
-    border: 1px solid rgba(75, 85, 99, 0.3);
-    border-radius: 16px;
+.card {
+    background: white;
+    border: 1px solid #E0E0E0;
+    border-radius: 8px;
     padding: 1.5rem;
-    text-align: center;
-    transition: all 0.3s ease;
+    height: 100%;
+    transition: transform 0.2s;
 }
-
-.feature-card:hover {
-    border-color: #00A0DC;
-    transform: translateY(-5px);
-    box-shadow: 0 10px 30px rgba(0, 160, 220, 0.2);
+.card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    transform: translateY(-2px);
+}
+.card-title {
+    color: #0F52BA;
+    font-weight: 600;
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+}
+.card-text {
+    color: #546e7a;
+    font-size: 0.9rem;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
-
 def apply_chart_theme(fig):
-    """
-    Applies premium dark theme to Plotly charts.
-    """
+    """Applies professional light theme to charts."""
     fig.update_layout(
-        template="plotly_dark",
-        font=dict(family="Inter, sans-serif", size=12, color="#e0e6ed"),
-        title_font=dict(family="Outfit, sans-serif", size=18, color="#f0f6fc"),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
+        template="plotly_white",
+        font=dict(family="Inter, sans-serif", size=12, color="#2c3e50"),
+        title_font=dict(family="Inter, sans-serif", size=16, color="#1a237e", weight=600),
+        xaxis=dict(showgrid=True, gridcolor="#F0F2F5", linecolor="#CFD8DC"),
+        yaxis=dict(showgrid=True, gridcolor="#F0F2F5", linecolor="#CFD8DC"),
         margin=dict(l=40, r=40, t=60, b=40),
-        hoverlabel=dict(
-            bgcolor="#1a1f2e",
-            font_size=12,
-            font_family="Inter, sans-serif",
-            bordercolor="#00A0DC",
-            font_color="#f0f6fc"
-        ),
-        showlegend=True,
-        legend=dict(
-            bgcolor="rgba(0,0,0,0)",
-            borderwidth=0,
-            font=dict(color="#e0e6ed"),
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1
-        ),
-        xaxis=dict(
-            showgrid=True,
-            gridcolor="rgba(75, 85, 99, 0.2)",
-            linecolor="rgba(75, 85, 99, 0.4)",
-            zeroline=False,
-            title_font=dict(size=12, color="#9ca3af"),
-            tickfont=dict(color="#9ca3af")
-        ),
-        yaxis=dict(
-            showgrid=True,
-            gridcolor="rgba(75, 85, 99, 0.2)",
-            linecolor="rgba(75, 85, 99, 0.4)",
-            zeroline=False,
-            title_font=dict(size=12, color="#9ca3af"),
-            tickfont=dict(color="#9ca3af")
-        )
+        hoverlabel=dict(bgcolor="white", font_size=12)
     )
-    
     return fig
-
-
-def get_risk_color(risk_pct):
-    """Returns color based on risk percentage."""
-    if risk_pct < 30:
-        return "#10B981"  # Green
-    elif risk_pct < 70:
-        return "#F59E0B"  # Yellow
-    else:
-        return "#EF4444"  # Red
-
-
-def render_hero_section():
-    """Renders the landing page hero section."""
-    st.markdown("""
-    <div style="text-align: center; padding: 3rem 0;">
-        <h1 class="hero-title">🎓 Student Analytics</h1>
-        <p class="hero-subtitle">AI-Powered Dropout Prediction & Retention Intelligence</p>
-    </div>
-    """, unsafe_allow_html=True)
