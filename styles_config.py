@@ -123,7 +123,7 @@ div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
    ============================================================================= */
 /* Default Main Area Buttons (Action) */
 .stMain .stButton > button {
-    background-color: #238636 !important; /* Green Action */
+    background-color: #da3633 !important; /* Professional Red */
     color: white !important;
     border: 1px solid rgba(240, 246, 252, 0.1) !important;
     border-radius: 6px;
@@ -131,8 +131,8 @@ div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
 }
 
 .stMain .stButton > button:hover {
-    background-color: #2ea043 !important;
-    box-shadow: 0 0 8px rgba(46, 160, 67, 0.4);
+    background-color: #b62d2a !important;
+    box-shadow: 0 0 8px rgba(218, 54, 51, 0.4);
 }
 
 /* Sidebar Navigation Buttons (Ghost Style) */
