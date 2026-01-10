@@ -18,23 +18,28 @@ The central command center.
 
 - **Real-Time KPIs**: Monitor total enrollment, active risk cases, and satisfaction pulse.
 - **Split-Screen Intelligence**:
-  - **Left Wing (Tactical)**: Immediate "Intervention Queue" showing top 5 critical risk students.
-  - **Right Wing (Strategic)**: Machine Learning insights on behavioral clusters and satisfaction drivers.
+  - **Left Wing (Tactical)**: "Priority Intervention Queue" highlighting students requiring immediate attention.
+  - **Right Wing (Strategic)**: "Strategic Insights" showing satisfaction drivers and cluster trends.
 
 ### 2. 🚨 Intervention Console (Retention Management)
 
 A dedicated workspace for academic counselors.
 
-- **Risk Tiers**: Filter students by Critical (>80%), High (>60%), or Moderate risk.
+- **Risk Tiers**:
+  - **Critical (> 75%)**: Immediate intervention required.
+  - **Monitor (35% - 75%)**: Watch list for potential issues.
+  - **Safe (< 35%)**: Low risk population.
 - **Actionable Lists**: Direct export of at-risk cohorts for email campaigns or counseling scheduling.
-- **Churn Prediction Model**: Uses a Random Forest classifier (50 trees, depth 6) to calculate precise dropout probabilities.
+- **Churn Prediction Model**: Uses a Random Forest classifier to calculate precise dropout probabilities.
 
 ### 3. 🧩 Student 360° (Holistic Profiling)
 
 Understanding the student beyond the grades.
 
 - **Behavioral Clustering (K-Means)**: Segments students into 4 distinct archetypes (e.g., "Disengaged", "High Achievers").
-- **Satisfaction Analysis (Boosted Tree)**: Predicts student satisfaction scores (0-10) based on academic load and performance.
+- **Psychometric Intelligence**:
+  - **Silent Burnout Detection**: Identifies students with high grades (GPA) but dangerously low satisfaction.
+  - **Resilience Analysis**: Highlights students with lower grades but high engagement/satisfaction.
 - **Feature Importance**: Explains *why* the models are making certain predictions.
 
 ### 4. 💾 Raw Data Explorer
@@ -58,7 +63,8 @@ Direct access to the underlying BigQuery warehouse for auditing and custom analy
 
 ### Prerequisites
 
-* Python 3.9+
+- Python 3.9+
+
 - Google Cloud Platform Service Account (JSON Key)
 
 ### Steps
@@ -99,6 +105,7 @@ Direct access to the underlying BigQuery warehouse for auditing and custom analy
 ## 📄 License & Authors
 
 **Authors:**
+
 - Alessandro Geli
 - Giacomo Dellacqua
 - Paolo Junior Del Giudice
