@@ -126,192 +126,177 @@ def render_intervention_console():
     
     # Load Data
     df = data_utils.load_table_data_optimized("studenti_churn_pred")
+    if not df.empty:
+        df['student_id'] = df['student_id'].astype(str)
     
     # 1. FILTER BAR
     c1, c2 = st.columns([3, 1])
     with c1:
-        st.markdown("##### Filter by Risk Tier")
-        # Added "Low Risk" and set "All" as default to avoid confusion
-        tier = st.radio(
-            "Tier", 
-            ["All", "Critical (>80%)", "High (>60%)", "Moderate (>40%)", "Low (<40%)"], 
+        st.markdown("##### Risk Segment")
+        # Simplified Tiers to match SQL Model (Alto >= 70, Medio >= 40, Basso < 40)
+        risk_mode = st.radio(
+            "Risk Segment", 
+            ["All Students", "Critical (>70%)", "Monitor (40-70%)", "Safe (<40%)"], 
             index=0, 
             horizontal=True, 
             label_visibility="collapsed"
         )
 
     with c2:
-        st.markdown("##### Export")
-        st.download_button("Download List", "csv_content", "intervention_list.csv", "text/csv", use_container_width=True)
+        st.markdown("##### Actions")
+        st.download_button("Export .CSV", "csv_content", "intervention_list.csv", "text/csv", use_container_width=True)
 
-    # Filter Logic (Mutually Exclusive)
-    filter_desc = "Full Population"
+    # Filter Logic - Aligned with SQL 'categoria_rischio'
+    filter_desc = "Entire Student Population"
+    filtered_df = df.copy()
+    
     if not df.empty and 'churn_percentage' in df.columns:
-        if "Critical" in tier: 
-            df = df[df['churn_percentage'] > 80]
-            filter_desc = "Critical Risk Tier (>80%)"
-        elif "High" in tier: 
-            df = df[(df['churn_percentage'] > 60) & (df['churn_percentage'] <= 80)]
-            filter_desc = "High Risk Tier (60-80%)"
-        elif "Moderate" in tier: 
-            df = df[(df['churn_percentage'] > 40) & (df['churn_percentage'] <= 60)]
-            filter_desc = "Moderate Risk Tier (40-60%)"
-        elif "Low" in tier:
-            df = df[df['churn_percentage'] <= 40]
-            filter_desc = "Low Risk Tier (<40%)"
+        if "Critical" in risk_mode: 
+            filtered_df = df[df['churn_percentage'] >= 70]
+            filter_desc = "Critical Risk (>70%)"
+        elif "Monitor" in risk_mode: 
+            filtered_df = df[(df['churn_percentage'] >= 40) & (df['churn_percentage'] < 70)]
+            filter_desc = "Monitor List (40-70%)"
+        elif "Safe" in risk_mode:
+            filtered_df = df[df['churn_percentage'] < 40]
+            filter_desc = "Safe Zone (<40%)"
         
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # 2. MAIN TABLE
-    
-    tab_report, tab_grid = st.tabs(["Intelligence Briefing", "Data Grid"])
+    # 2. MAIN WORKSPACE
+    tab_report, tab_grid = st.tabs(["📊 Intelligence Briefing", "📋 Student List"])
     
     with tab_report:
-         # 3. AI REPORT - Dynamic based on selection
         lines = []
         lines.append(f"""
         <div class="report-box">
-        <div class="report-header">AI Briefing: {filter_desc}</div>
+        <div class="report-header">Analysis: {filter_desc}</div>
         """)
         
-        if not df.empty:
-            avg_risk = df['churn_percentage'].mean()
-            lines.append(f"<p><strong>Subset Analysis:</strong> Focusing on <strong>{len(df):,} students</strong> in this tier.</p>")
-            lines.append(f"<p><strong>Average Risk:</strong> {avg_risk:.1f}%</p>")
+        if not filtered_df.empty:
+            count = len(filtered_df)
+            avg_risk = filtered_df['churn_percentage'].mean()
             
-            if "Critical" in tier:
-                lines.append("<p style='color: #FF7B72;'><strong>Urgency:</strong> Immediate 1-on-1 counseling recommended.</p>")
-            elif "High" in tier:
-                lines.append("<p style='color: #D2A8DA;'><strong>Strategy:</strong> Schedule academic plan review within 14 days.</p>")
-            elif "Moderate" in tier:
-                lines.append("<p style='color: #79C0FF;'><strong>Strategy:</strong> Send automated check-in emails and resources.</p>")
-            elif "Low" in tier:
-                lines.append("<p style='color: #7EE787;'><strong>Status:</strong> Healthy cohort. No intervention required.</p>")
-            elif "All" in tier:
-                 risk_dist = df['categoria_rischio'].value_counts()
-                 lines.append(f"<p><strong>Population Health:</strong> {risk_dist.get('Basso Rischio', 0):,} Safe vs {risk_dist.get('Alto Rischio', 0):,} At Risk.</p>")
+            # Contextual Metrics
+            c_rpt1, c_rpt2, c_rpt3 = st.columns(3)
+            with c_rpt1: st.metric("Students Selected", f"{count:,}")
+            with c_rpt2: st.metric("Avg Risk Score", f"{avg_risk:.1f}%")
             
-            if "Low" not in tier and len(df) < 500: # Only list cases for manageable lists
-                lines.append("<hr style='border-color: #30363D; margin: 10px 0;'>")
-                lines.append("<p><strong>Top Cases:</strong></p><ul>")
-                for i, row in df.sort_values(by='churn_percentage', ascending=False).head(3).iterrows():
-                     lines.append(f"<li>Student <strong>{row['student_id']}</strong>: {row['churn_percentage']:.1f}%</li>")
-                lines.append("</ul>")
+            lines.append(f"<p style='margin-top: 10px;'><strong>Status:</strong> Tracking {count:,} students in this segment.</p>")
+            
+            if "Critical" in risk_mode:
+                lines.append("<p style='color: #FF7B72;'><strong>Recommendation:</strong> <br>• Immediate advisor intervention required.<br>• Prioritize students with decreasing exam trends.</p>")
+            elif "Monitor" in risk_mode:
+                lines.append("<p style='color: #D2A8DA;'><strong>Recommendation:</strong> <br>• Schedule automated check-in email.<br>• Review support services offered.</p>")
+            elif "Safe" in risk_mode:
+                lines.append("<p style='color: #7EE787;'><strong>Recommendation:</strong> <br>• No action needed.<br>• Consider for peer-mentorship programs.</p>")
+            elif "All" in risk_mode:
+                crit_count = len(df[df['churn_percentage'] >= 70])
+                safe_count = len(df[df['churn_percentage'] < 40])
+                lines.append(f"<p><strong>Distribution:</strong> detected {crit_count:,} critical cases vs {safe_count:,} safe students.</p>")
+
+            lines.append("</div>")
+            st.markdown("\n".join(lines), unsafe_allow_html=True)
+            
         else:
-            lines.append("<p>No students found matching this risk profile.</p>")
-            
-        lines.append("</div>")
-        st.markdown("\n".join(lines), unsafe_allow_html=True)
-        
+            st.info("No students found in this category. Good news!")
+
     with tab_grid:
         st.dataframe(
-            df,
+            filtered_df,
             use_container_width=True,
             height=600,
             column_config={
                 "churn_percentage": st.column_config.ProgressColumn(
-                    "Risk Probability", 
+                    "Risk Score", 
                     min_value=0, 
                     max_value=100,
                     format="%.1f%%"
                 ),
-                "categoria_rischio": st.column_config.TextColumn("Risk Category")
-            }
+                "categoria_rischio": st.column_config.TextColumn("Risk Category"),
+                "student_id": st.column_config.TextColumn("Student ID")
+            },
+            hide_index=True
         )
 
 
 # ─── 5) VIEW: STUDENT 360 (CLUSTERS + SAT) ─────────────────────────────────
 
 def render_student_360():
-    st.title("Student 360 Profiling")
-    st.markdown("Behavioral segmentation and satisfaction drivers.")
+    st.title("Student 360")
+    st.markdown("Holistic profiling and behavioral segmentation.")
     st.markdown("---")
     
-    tab_clusters, tab_satisfaction, tab_features = st.tabs(["Behavioral Clusters", "Satisfaction Analysis", "Driver Analysis"])
+    tab_clusters, tab_satisfaction, tab_features = st.tabs(["🧩 Clustering", "❤️ Satisfaction", "⚡ Driver Analysis"])
     
     with tab_clusters:
-        st.subheader("Clustering Analysis")
+        st.subheader("Behavioral Archetypes")
         df_clust = data_utils.load_table_data_optimized("studenti_cluster")
         df_churn = data_utils.load_table_data_optimized("studenti_churn_pred")
+        
+        # Ensure ID consistency for merge
+        if not df_clust.empty: df_clust['student_id'] = df_clust['student_id'].astype(str)
+        if not df_churn.empty: df_churn['student_id'] = df_churn['student_id'].astype(str)
 
         if not df_clust.empty:
-            # JOIN Logic for richer insights
+            # JOIN Logic
             if not df_churn.empty:
                 merged = pd.merge(df_clust, df_churn[['student_id', 'churn_percentage', 'categoria_rischio']], on='student_id', how='left')
             else:
                 merged = df_clust
             
-            # Smart Report Generation
+            # REPORT
             lines = []
             lines.append(f"""
             <div class="report-box">
-            <div class="report-header">AI Cluster Intelligence</div>
+            <div class="report-header">Cluster Intelligence</div>
             """)
             
             n_clusters = merged['cluster'].nunique()
-            lines.append(f"<p><strong>Structure:</strong> Population divided into <strong>{n_clusters} behavioral archetypes</strong>.</p>")
+            lines.append(f"<p>Population segmented into <strong>{n_clusters} clusters</strong> interactions.</p>")
             
-            # Largest Cluster
-            cluster_counts = merged['cluster'].value_counts()
-            largest_cluster = cluster_counts.idxmax()
-            lines.append(f"<p><strong>Dominant Group:</strong> Cluster {largest_cluster} contains {cluster_counts.max():,} students ({(cluster_counts.max()/len(merged)*100):.1f}%).</p>")
-            
-            # Risk Analysis per Cluster (if available)
             if 'churn_percentage' in merged.columns:
-                 risk_per_cluster = merged.groupby('cluster')['churn_percentage'].mean()
-                 msg_risk = ""
-                 highest_risk_cluster = risk_per_cluster.idxmax()
-                 msg_risk = f"<p style='color: #FF7B72;'><strong>Risk Alert:</strong> Cluster {highest_risk_cluster} shows highest attrition risk ({risk_per_cluster.max():.1f}% avg). Targeted intervention required.</p>"
-                 lines.append(msg_risk)
+                 risk_grp = merged.groupby('cluster')['churn_percentage'].mean().sort_values(ascending=False)
+                 highest_risk_c = risk_grp.index[0]
+                 lowest_risk_c = risk_grp.index[-1]
                  
-                 lowest_risk_cluster = risk_per_cluster.idxmin()
-                 lines.append(f"<p style='color: #7EE787;'><strong>Retention Stronghold:</strong> Cluster {lowest_risk_cluster} is most stable ({risk_per_cluster.min():.1f}% avg).</p>")
-
+                 lines.append(f"<p>⚠️ <strong>Highest Risk:</strong> Cluster <strong>{highest_risk_c}</strong> ({risk_grp[highest_risk_c]:.1f}% avg risk).</p>")
+                 lines.append(f"<p>✅ <strong>Most Stable:</strong> Cluster <strong>{lowest_risk_c}</strong> ({risk_grp[lowest_risk_c]:.1f}% avg risk).</p>")
+            
             lines.append("</div>")
             st.markdown("\n".join(lines), unsafe_allow_html=True)
-            
             st.markdown("<br>", unsafe_allow_html=True)
-            st.dataframe(merged.head(200), use_container_width=True, height=400)
+            
+            st.dataframe(
+                merged.head(500), 
+                use_container_width=True, 
+                height=500,
+                column_config={
+                    "churn_percentage": st.column_config.ProgressColumn("Risk", format="%.0f%%"),
+                    "distance_to_centroid": st.column_config.NumberColumn("Fit Score", format="%.2f")
+                }
+            )
     
     with tab_satisfaction:
-        st.subheader("Satisfaction Predictions")
+        st.subheader("Voice of Student")
         df_sat = data_utils.load_table_data_optimized("report_finale_soddisfazione_studenti")
         
         if not df_sat.empty:
-             lines = []
-             lines.append(f"""
-            <div class="report-box">
-            <div class="report-header">Satisfaction Pulse</div>
-            """)
-             sat_avg = df_sat['soddisfazione_predetta'].mean()
-             lines.append(f"<p><strong>Average Score:</strong> {sat_avg:.1f} / 10</p>")
-             
-             low_sat = len(df_sat[df_sat['soddisfazione_predetta'] < 6])
-             if low_sat > 0:
-                  lines.append(f"<p style='color: #D2A8DA;'><strong>Concern:</strong> {low_sat:,} students are projected to have low satisfaction (<6.0).</p>")
-             
-             lines.append("</div>")
-             st.markdown("\n".join(lines), unsafe_allow_html=True)
+             val_counts = len(df_sat[df_sat['soddisfazione_predetta'] < 6])
+             st.metric("Students with Low Satisfaction (<6.0)", f"{val_counts:,}", help="Priority for engagement")
              
         st.dataframe(
-            df_sat.head(100), 
+            df_sat.head(200), 
             use_container_width=True,
             column_config={
-                "soddisfazione_predetta": st.column_config.NumberColumn("Predicted Score", format="%.1f / 10")
+                "soddisfazione_predetta": st.column_config.NumberColumn("Predicted CSAT", format="%.1f / 10")
             }
         )
 
     with tab_features:
-        st.subheader("Feature Importance")
-        st.markdown("What drives these results?")
+        st.subheader("Model Explainability")
         df_feat = data_utils.load_table_data_optimized("feature_importance_studenti")
-        st.dataframe(
-            df_feat,
-            use_container_width=True,
-            column_config={
-                "peso_importanza": st.column_config.ProgressColumn("Impact Weight", min_value=0, max_value=max(df_feat['peso_importanza']) if not df_feat.empty else 1)
-            }
-        )
+        st.bar_chart(df_feat.set_index('feature')['peso_importanza'], color="#da3633")
         
 # ─── 6) LANDING PAGE ───────────────────────────────────────────────────────
 
