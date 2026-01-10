@@ -117,6 +117,8 @@ def render_control_tower():
 
 # ─── 4) VIEW: INTERVENTION CONSOLE (RISK) ──────────────────────────────────
 
+# ─── 4) VIEW: INTERVENTION CONSOLE (RISK) ──────────────────────────────────
+
 def render_intervention_console():
     st.title("Intervention Console")
     st.markdown("Monitor and act on attrition risks.")
@@ -129,7 +131,9 @@ def render_intervention_console():
     c1, c2 = st.columns([3, 1])
     with c1:
         st.markdown("##### Filter by Risk Tier")
-        tier = st.segmented_control("Tier", ["All", "Critical (>80%)", "High (>60%)", "Moderate (>40%)"], default="Critical (>80%)")
+        # Replaced st.segmented_control with st.radio for stability
+        tier = st.radio("Tier", ["All", "Critical (>80%)", "High (>60%)", "Moderate (>40%)"], index=1, horizontal=True, label_visibility="collapsed")
+
     with c2:
         st.markdown("##### Export")
         st.download_button("Download List", "csv_content", "intervention_list.csv", "text/csv", use_container_width=True)
@@ -236,70 +240,76 @@ def render_landing_page():
 # ─── 7) MAIN APP ROUTER ────────────────────────────────────────────────────
 
 def main():
-    styles_config.inject_custom_css()
+    try:
+        styles_config.inject_custom_css()
+        
+        # Initialize State
+        if "show_landing" not in st.session_state:
+            st.session_state["show_landing"] = True
+            
+        if st.session_state["show_landing"]:
+            render_landing_page()
+            return
     
-    # Initialize State
-    if "show_landing" not in st.session_state:
-        st.session_state["show_landing"] = True
-        
-    if st.session_state["show_landing"]:
-        render_landing_page()
-        return
-
-    if 'view' not in st.session_state:
-        st.session_state['view'] = 'control_tower'
-
-    # SIDEBAR NAVIGATION
-    with st.sidebar:
-        st.title("Student Intelligence")
-        st.caption("Connected to BigQuery")
-        st.markdown("---")
-        
-        # NAVIGATION MENU
-        if st.button("Control Tower", use_container_width=True):
+        if 'view' not in st.session_state:
             st.session_state['view'] = 'control_tower'
-            st.rerun()
-            
-        st.markdown("---")
-        st.caption("OPERATIONS")
-        
-        if st.button("Intervention Console", use_container_width=True):
-            st.session_state['view'] = 'intervention_console'
-            st.rerun()
-            
-        if st.button("Student 360", use_container_width=True):
-            st.session_state['view'] = 'student_360'
-            st.rerun()
-            
-        st.markdown("---")
-        st.caption("DATA GOVERNANCE")
-        
-        if st.button("Raw Data Explorer", use_container_width=True):
-            st.session_state['view'] = 'raw_data'
-            st.rerun()
-
-    # ROUTING LOGIC
-    view = st.session_state['view']
     
-    if view == 'control_tower':
-        render_control_tower()
+        # SIDEBAR NAVIGATION
+        with st.sidebar:
+            st.title("Student Intelligence")
+            st.caption("Connected to BigQuery")
+            st.markdown("---")
+            
+            # NAVIGATION MENU
+            if st.button("Control Tower", use_container_width=True):
+                st.session_state['view'] = 'control_tower'
+                st.rerun()
+                
+            st.markdown("---")
+            st.caption("OPERATIONS")
+            
+            if st.button("Intervention Console", use_container_width=True):
+                st.session_state['view'] = 'intervention_console'
+                st.rerun()
+                
+            if st.button("Student 360", use_container_width=True):
+                st.session_state['view'] = 'student_360'
+                st.rerun()
+                
+            st.markdown("---")
+            st.caption("DATA GOVERNANCE")
+            
+            if st.button("Raw Data Explorer", use_container_width=True):
+                st.session_state['view'] = 'raw_data'
+                st.rerun()
+    
+        # ROUTING LOGIC
+        view = st.session_state['view']
         
-    elif view == 'intervention_console':
-        render_intervention_console()
-        
-    elif view == 'student_360':
-        render_student_360()
-        
-    elif view == 'raw_data':
-        st.title("Raw Data Explorer")
-        st.markdown("Direct access to BigQuery tables.")
-        tables = data_utils.get_tables_metadata_cached()
-        tabs = st.tabs([t['name'] for t in tables])
-        for i, t in enumerate(tables):
-            with tabs[i]:
-                df = data_utils.load_table_data_optimized(t['id'])
-                st.dataframe(df.head(200), use_container_width=True)
-                st.caption(f"Showing first 200 rows of {t['id']}")
+        if view == 'control_tower':
+            render_control_tower()
+            
+        elif view == 'intervention_console':
+            render_intervention_console()
+            
+        elif view == 'student_360':
+            render_student_360()
+            
+        elif view == 'raw_data':
+            st.title("Raw Data Explorer")
+            st.markdown("Direct access to BigQuery tables.")
+            tables = data_utils.get_tables_metadata_cached()
+            tabs = st.tabs([t['name'] for t in tables])
+            for i, t in enumerate(tables):
+                with tabs[i]:
+                    df = data_utils.load_table_data_optimized(t['id'])
+                    st.dataframe(df.head(200), use_container_width=True)
+                    st.caption(f"Showing first 200 rows of {t['id']}")
+                    
+    except Exception as e:
+        st.error(f"SYSTEM ERROR: {e}")
+        import traceback
+        st.code(traceback.format_exc())
 
 if __name__ == "__main__":
     main()
