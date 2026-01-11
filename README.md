@@ -59,7 +59,7 @@ Direct access to the underlying BigQuery warehouse for auditing and custom analy
 
 ---
 
-## 🚀 Installation & Setup
+## Installation & Setup
 
 ### Prerequisites
 
