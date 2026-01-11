@@ -116,4 +116,3 @@ Direct access to the underlying BigQuery warehouse for auditing and custom analy
 This project is licensed under the **Apache License 2.0**. See the `LICENSE` file for details.
 
 ---
-*Built for the Data Mining & Text Analytics Design Project - 2026*
