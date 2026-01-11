@@ -178,7 +178,7 @@ def render_intervention_console():
     st.markdown("<br>", unsafe_allow_html=True)
     
     # 2. MAIN WORKSPACE
-    tab_report, tab_grid = st.tabs(["📊 Intelligence Briefing", "📋 Student List"])
+    tab_report, tab_grid = st.tabs(["Intelligence Briefing", "Student List"])
     
     with tab_report:
         lines = []
@@ -245,7 +245,7 @@ def render_student_360():
     st.markdown("Holistic profiling and behavioral segmentation.")
     st.markdown("---")
     
-    tab_clusters, tab_satisfaction, tab_features = st.tabs(["🧩 Clustering", "❤️ Satisfaction", "⚡ Driver Analysis"])
+    tab_clusters, tab_satisfaction, tab_features = st.tabs(["Clustering", "Satisfaction", "Driver Analysis"])
     
     with tab_clusters:
         st.subheader("Behavioral Archetypes")
@@ -278,8 +278,8 @@ def render_student_360():
                  highest_risk_c = risk_grp.index[0]
                  lowest_risk_c = risk_grp.index[-1]
                  
-                 lines.append(f"<p>⚠️ <strong>Highest Risk:</strong> Cluster <strong>{highest_risk_c}</strong> ({risk_grp[highest_risk_c]:.1f}% avg risk).</p>")
-                 lines.append(f"<p>✅ <strong>Most Stable:</strong> Cluster <strong>{lowest_risk_c}</strong> ({risk_grp[lowest_risk_c]:.1f}% avg risk).</p>")
+                 lines.append(f"<p><strong>Highest Risk:</strong> Cluster <strong>{highest_risk_c}</strong> ({risk_grp[highest_risk_c]:.1f}% avg risk).</p>")
+                 lines.append(f"<p><strong>Most Stable:</strong> Cluster <strong>{lowest_risk_c}</strong> ({risk_grp[lowest_risk_c]:.1f}% avg risk).</p>")
             
             lines.append("</div>")
             st.markdown("\n".join(lines), unsafe_allow_html=True)
@@ -310,24 +310,24 @@ def render_student_360():
              
              def classify_sentiment(row):
                  if row['gap'] < -1.5:
-                     return "⚠️ Silent Burnout"
+                     return "Silent Burnout"
                  elif row['gap'] > 1.5:
-                     return "⭐ Resilient"
+                     return "Resilient"
                  elif row['soddisfazione_reale'] < 6.0:
-                     return "🔴 At Risk"
+                     return "At Risk"
                  else:
-                     return "✅ Aligned"
+                     return "Aligned"
 
              df_sat['psychometric_status'] = df_sat.apply(classify_sentiment, axis=1)
              
              # ─── RICH REPORT GENERATION ───
-             burnout_df = df_sat[df_sat['psychometric_status'] == "⚠️ Silent Burnout"]
-             resilient_df = df_sat[df_sat['psychometric_status'] == "⭐ Resilient"]
+             burnout_df = df_sat[df_sat['psychometric_status'] == "Silent Burnout"]
+             resilient_df = df_sat[df_sat['psychometric_status'] == "Resilient"]
              
              report_lines = []
              report_lines.append(f"""
 <div class="report-box">
-<div class="report-header">🧠 Psychometric Intelligence Briefing</div>
+<div class="report-header">Psychometric Intelligence Briefing</div>
 """)
              
              # 1. Silent Burnout Analysis
@@ -340,7 +340,7 @@ def render_student_360():
                      gpa_text = ""
                      
                  report_lines.append(f"""
-<p style='color: #FF7B72; margin-bottom: 5px;'><strong>⚠️ CRITICAL INSIGHT: Silent Burnout Detected</strong></p>
+<p style='color: #FF7B72; margin-bottom: 5px;'><strong>CRITICAL INSIGHT: Silent Burnout Detected</strong></p>
 <p>We identified <strong>{len(burnout_df):,} students</strong> who are academically strong {gpa_text} but report significantly lower satisfaction than predicted.</p>
 <ul style='margin-bottom: 15px;'>
 <li><strong>The Pattern:</strong> They perform well but are emotionally exhausted.</li>
@@ -352,7 +352,7 @@ def render_student_360():
              # 2. Resilience Analysis
              if not resilient_df.empty:
                  report_lines.append(f"""
-<p style='color: #7EE787; margin-bottom: 5px;'><strong>⭐ POSITIVE DEVIANCE: The Resilient Group</strong></p>
+<p style='color: #7EE787; margin-bottom: 5px;'><strong>POSITIVE DEVIANCE: The Resilient Group</strong></p>
 <p>There are <strong>{len(resilient_df):,} students</strong> outperforming expectations. Despite lower academic inputs, their satisfaction is high.</p>
 <ul style='margin-bottom: 15px;'>
 <li><strong>The Opportunity:</strong> These students have high grit and school spirit.</li>
@@ -361,7 +361,7 @@ def render_student_360():
 """)
                  
              if burnout_df.empty and resilient_df.empty:
-                 report_lines.append("<p>✅ The student population is psychometrically aligned. Reported satisfaction matches academic performance expectations.</p>")
+                 report_lines.append("<p>The student population is psychometrically aligned. Reported satisfaction matches academic performance expectations.</p>")
                  
              report_lines.append("</div>")
              st.markdown("\n".join(report_lines), unsafe_allow_html=True)

@@ -1,4 +1,4 @@
-# Student Intelligence Hub 🎓
+# Student Intelligence Hub
 
 > **Advanced Predictive Analytics for Higher Education Retention**
 
@@ -8,11 +8,11 @@ A cloud-native platform engineered to transform raw academic data into actionabl
 
 ---
 
-## 🏗️ Architecture: The "Control Tower" Concept
+## Architecture: The "Control Tower" Concept
 
 The application is structured around a workflow-first approach, moving from high-level strategy to granular intervention.
 
-### 1. 📊 Control Tower (Executive Overview)
+### 1. Control Tower (Executive Overview)
 
 The central command center.
 
@@ -21,7 +21,7 @@ The central command center.
   - **Left Wing (Tactical)**: "Priority Intervention Queue" highlighting students requiring immediate attention.
   - **Right Wing (Strategic)**: "Strategic Insights" showing satisfaction drivers and cluster trends.
 
-### 2. 🚨 Intervention Console (Retention Management)
+### 2. Intervention Console (Retention Management)
 
 A dedicated workspace for academic counselors.
 
@@ -32,7 +32,7 @@ A dedicated workspace for academic counselors.
 - **Actionable Lists**: Direct export of at-risk cohorts for email campaigns or counseling scheduling.
 - **Churn Prediction Model**: Uses a Random Forest classifier to calculate precise dropout probabilities.
 
-### 3. 🧩 Student 360° (Holistic Profiling)
+### 3. Student 360° (Holistic Profiling)
 
 Understanding the student beyond the grades.
 
@@ -48,7 +48,7 @@ Direct access to the underlying BigQuery warehouse for auditing and custom analy
 
 ---
 
-## 🛠️ Technical Stack
+## Technical Stack
 
 | Component | Technology | Description |
 |-----------|------------|-------------|
@@ -59,7 +59,7 @@ Direct access to the underlying BigQuery warehouse for auditing and custom analy
 
 ---
 
-## 🚀 Installation & Setup
+## Installation & Setup
 
 ### Prerequisites
 
@@ -102,7 +102,7 @@ Direct access to the underlying BigQuery warehouse for auditing and custom analy
 
 ---
 
-## 📄 License & Authors
+## License & Authors
 
 **Authors:**
 
@@ -116,4 +116,3 @@ Direct access to the underlying BigQuery warehouse for auditing and custom analy
 This project is licensed under the **Apache License 2.0**. See the `LICENSE` file for details.
 
 ---
-*Built for the Data Mining & Text Analytics Design Project - 2026*
