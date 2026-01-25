@@ -7,6 +7,7 @@ import logging
 import constants
 import styles_config
 import data_utils
+import ml_utils
 
 # ─── 1) PAGE CONFIGURATION ─────────────────────────────────────────────────
 
@@ -407,22 +408,57 @@ def render_student_360():
 # ─── 6) LANDING PAGE ───────────────────────────────────────────────────────
 
 def render_landing_page():
-    st.markdown("<br><br>", unsafe_allow_html=True)
-    st.title("Student Intelligence Hub")
+    st.markdown("<br>", unsafe_allow_html=True)
     
+    # Hero Section with glassmorphism
     st.markdown("""
-    ### Welcome to the Student Intelligence Hub
-
-    This platform serves as the central nervous system for academic retention strategies. It ingests real-time student data to provide:
-
-    *   **Predictive Risk Modeling**: Foreseeing potential dropouts before they happen.
-    *   **Behavioral Clustering**: Understanding the "why" behind student groups.
-    *   **Satisfaction Analysis**: Measuring the pulse of the student body.
-
-    **Getting Started:**
-    Use the navigation sidebar to access the **Control Tower** for a high-level overview, or dive into the **Intervention Console** to take action on specific cases.
-    <br><br>
+    <div class="hero-gradient">
+        <h1 style="margin-bottom: 0.5rem;">Student Intelligence Hub</h1>
+        <p style="font-size: 1.2rem; color: #8b949e;">Advanced Predictive Analytics for Higher Education Retention</p>
+    </div>
     """, unsafe_allow_html=True)
+    
+    # Feature Cards
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown("""
+        <div class="glass-card">
+            <h3>Predictive Risk Modeling</h3>
+            <p>Random Forest algorithm forecasts potential dropouts before they happen.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with col2:
+        st.markdown("""
+        <div class="glass-card">
+            <h3>Behavioral Clustering</h3>
+            <p>K-Means segmentation reveals distinct student archetypes.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with col3:
+        st.markdown("""
+        <div class="glass-card">
+            <h3>Satisfaction Analysis</h3>
+            <p>Boosted Tree regression measures the pulse of student experience.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Getting Started
+    st.markdown("""
+    ### Getting Started
+    
+    Use the navigation sidebar to access the **Control Tower** for a high-level overview, 
+    or dive into the **Intervention Console** to take action on specific cases.
+    
+    **Alex**, your AI Academic Advisor, is available in the sidebar to answer questions 
+    about risk analysis, student clustering, and retention strategies.
+    """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
     
     if st.button("Enter Control Tower", type="primary"):
         st.session_state["show_landing"] = False
@@ -474,6 +510,35 @@ def main():
             if st.button("Raw Data Explorer", use_container_width=True):
                 st.session_state['view'] = 'raw_data'
                 st.rerun()
+            
+            # ADA AI ASSISTANT
+            st.markdown("---")
+            st.markdown("""
+            <div class="sidebar-chat-container">
+                <div class="sidebar-chat-header">Alex - Academic Advisor</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Get current view name for context
+            view_names = {
+                'control_tower': 'Control Tower',
+                'intervention_console': 'Intervention Console',
+                'student_360': 'Student 360',
+                'raw_data': 'Raw Data Explorer'
+            }
+            current_view = view_names.get(st.session_state.get('view', 'control_tower'), 'Control Tower')
+            
+            # Chat input
+            user_msg = st.text_input("Ask Alex...", key="ada_input", placeholder="How does risk scoring work?")
+            
+            # Get response
+            ada_response = ml_utils.get_alex_response(user_msg, current_view)
+            
+            st.markdown(f"""
+            <div class="sidebar-chat-message">
+                {ada_response}
+            </div>
+            """, unsafe_allow_html=True)
     
         # ROUTING LOGIC
         view = st.session_state['view']

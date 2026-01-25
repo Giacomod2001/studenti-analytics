@@ -5,6 +5,15 @@
 A cloud-native platform engineered to transform raw academic data into actionable retention strategies. Powered by **Google BigQuery** and **Streamlit**, this system provides a real-time "Control Tower" for university administrators to monitor, predict, and prevent student dropout.
 
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://progettodatamining.streamlit.app)
+[![Python](https://img.shields.io/badge/Python-3.9+-3776AB?style=flat&logo=python&logoColor=white)](https://www.python.org/)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/Version-1.0-0077B5?style=flat)](README.md)
+
+---
+
+## Live Demo
+
+**[Access Student Intelligence Hub](https://progettodatamining.streamlit.app)**
 
 ---
 
@@ -16,33 +25,33 @@ The application is structured around a workflow-first approach, moving from high
 
 The central command center.
 
-- **Real-Time KPIs**: Monitor total enrollment, active risk cases, and satisfaction pulse.
+- **Real-Time KPIs**: Monitor total enrollment, active risk cases, and satisfaction pulse
 - **Split-Screen Intelligence**:
-  - **Left Wing (Tactical)**: "Priority Intervention Queue" highlighting students requiring immediate attention.
-  - **Right Wing (Strategic)**: "Strategic Insights" showing satisfaction drivers and cluster trends.
+  - **Left Wing (Tactical)**: "Priority Intervention Queue" highlighting students requiring immediate attention
+  - **Right Wing (Strategic)**: "Strategic Insights" showing satisfaction drivers and cluster trends
 
 ### 2. Intervention Console (Retention Management)
 
 A dedicated workspace for academic counselors.
 
 - **Risk Tiers**:
-  - **Critical (> 75%)**: Immediate intervention required.
-  - **Monitor (35% - 75%)**: Watch list for potential issues.
-  - **Safe (< 35%)**: Low risk population.
-- **Actionable Lists**: Direct export of at-risk cohorts for email campaigns or counseling scheduling.
-- **Churn Prediction Model**: Uses a Random Forest classifier to calculate precise dropout probabilities.
+  - **Critical (> 75%)**: Immediate intervention required
+  - **Monitor (35% - 75%)**: Watch list for potential issues
+  - **Safe (< 35%)**: Low risk population
+- **Actionable Lists**: Direct export of at-risk cohorts for email campaigns or counseling scheduling
+- **Churn Prediction Model**: Uses a Random Forest classifier to calculate precise dropout probabilities
 
 ### 3. Student 360° (Holistic Profiling)
 
 Understanding the student beyond the grades.
 
-- **Behavioral Clustering (K-Means)**: Segments students into 4 distinct archetypes (e.g., "Disengaged", "High Achievers").
+- **Behavioral Clustering (K-Means)**: Segments students into 4 distinct archetypes
 - **Psychometric Intelligence**:
-  - **Silent Burnout Detection**: Identifies students with high grades (GPA) but dangerously low satisfaction.
-  - **Resilience Analysis**: Highlights students with lower grades but high engagement/satisfaction.
-- **Feature Importance**: Explains *why* the models are making certain predictions.
+  - **Silent Burnout Detection**: Identifies students with high grades but dangerously low satisfaction
+  - **Resilience Analysis**: Highlights students with lower grades but high engagement/satisfaction
+- **Feature Importance**: Explains *why* the models are making certain predictions
 
-### 4. 💾 Raw Data Explorer
+### 4. Raw Data Explorer
 
 Direct access to the underlying BigQuery warehouse for auditing and custom analysis.
 
@@ -59,12 +68,28 @@ Direct access to the underlying BigQuery warehouse for auditing and custom analy
 
 ---
 
+## Project Structure
+
+```
+studenti-analytics/
+├── streamlit_app.py    # Main application (~550 lines)
+├── ml_utils.py         # ML utilities & Alex AI Assistant [NEW]
+├── data_utils.py       # BigQuery client and data loading
+├── constants.py        # Project configuration and table metadata
+├── styles_config.py    # LinkedIn-style CSS theme
+├── requirements.txt    # Python dependencies
+├── SQL_QUERIES.md      # BigQuery ML queries documentation
+├── LICENSE             # Apache License 2.0
+└── README.md           # This documentation
+```
+
+---
+
 ## Installation & Setup
 
 ### Prerequisites
 
 - Python 3.9+
-
 - Google Cloud Platform Service Account (JSON Key)
 
 ### Steps
@@ -102,9 +127,21 @@ Direct access to the underlying BigQuery warehouse for auditing and custom analy
 
 ---
 
+## ML Models
+
+| Model | Algorithm | Purpose |
+|-------|-----------|---------|
+| **Churn Prediction** | Random Forest | Dropout probability scoring |
+| **Student Clustering** | K-Means (K=4) | Behavioral segmentation |
+| **Satisfaction Analysis** | Boosted Tree Regressor | Satisfaction score prediction |
+
+See [SQL_QUERIES.md](SQL_QUERIES.md) for complete BigQuery ML implementation.
+
+---
+
 ## License & Authors
 
-**Authors:**
+**Authors (IULM University - A.Y. 2025-2026):**
 
 - Alessandro Geli
 - Giacomo Dellacqua
@@ -116,3 +153,5 @@ Direct access to the underlying BigQuery warehouse for auditing and custom analy
 This project is licensed under the **Apache License 2.0**. See the `LICENSE` file for details.
 
 ---
+
+[Live Demo](https://progettodatamining.streamlit.app) | [GitHub](https://github.com/Giacomod2001/studenti-analytics)
