@@ -11,18 +11,41 @@ from typing import Dict, List, Tuple
 # =============================================================================
 
 _ALEX_RESPONSES = {
-    'default': "I am Alex, your Academic Learning Expert. I specialize in predictive modeling for student persistence and performance optimization.",
-    'greeting': "Greetings. I'm Alex. I analyze complex student data patterns to identify early signs of academic disengagement and churn risk.",
-    'dashboard': "The Control Tower displays real-time KDD process results. Monitor the 'Dropout Forecast'—it leverages a Random Forest ensemble to predict persistence probability.",
-    'intervention_console': "This console segments students using multi-factor risk scoring. Focus on 'Critical' students (>75% churn probability) who show declining exam frequency.",
-    'student_360': "Student 360 uses Behavioral Clustering. Look for 'Silent Burnout'—students with high academic performance but critically low satisfaction signals.",
-    'raw_data': "The Data Explorer provides direct access to the BigQuery analytical layer. Essential for auditing specific feature importance or raw psychometric scores.",
-    'risk_high': "Critical risk factors detected: dramatic drop in campus lighthouse interactions, missing exam deadlines, and low self-reported flexibility scores.",
-    'risk_low': "Persistence probability is high. These students align with the 'Resilient' archetype—stable performance even under high academic pressure.",
-    'cluster_info': "Unsupervised Learning (K-Means) has identified 4 distinct archetypes. From 'Working Students' needing flexibility to 'Social Learners' driven by engagement.",
-    'satisfaction': "The Satisfaction Predictor uses Gradient Boosted signals to estimate psychometric wellbeing. A negative gap often precedes a dropout event.",
-    'fallback': "I can provide insights on: Risk Segmentation (Churn), Behavioral Archetypes (Clustering), Satisfaction Analysis, and Intervention Priority (KDD Step 7)."
+    'en': {
+        'default': "I am Alex, your Academic Learning Expert. I specialize in predictive modeling for student persistence and performance optimization.",
+        'greeting': "Greetings. I'm Alex. I analyze complex student data patterns to identify early signs of academic disengagement and churn risk.",
+        'dashboard': "The Control Tower displays real-time KDD process results. Monitor the 'Dropout Forecast'—it leverages a Random Forest ensemble to predict persistence probability.",
+        'intervention_console': "This console segments students using multi-factor risk scoring. Focus on 'Critical' students (>75% churn probability) who show declining exam frequency.",
+        'student_360': "Student 360 uses Behavioral Clustering. Look for 'Silent Burnout'—students with high academic performance but critically low satisfaction signals.",
+        'raw_data': "The Data Explorer provides direct access to the BigQuery analytical layer. Essential for auditing specific feature importance or raw psychometric scores.",
+        'risk_high': "Critical risk factors detected: dramatic drop in campus lighthouse interactions, missing exam deadlines, and low self-reported flexibility scores.",
+        'risk_low': "Persistence probability is high. These students align with the 'Resilient' archetype—stable performance even under high academic pressure.",
+        'cluster_info': "Unsupervised Learning (K-Means) has identified 4 distinct archetypes. From 'Working Students' needing flexibility to 'Social Learners' driven by engagement.",
+        'satisfaction': "The Satisfaction Predictor uses Gradient Boosted signals to estimate psychometric wellbeing. A negative gap often precedes a dropout event.",
+        'fallback': "I can provide insights on: Risk Segmentation (Churn), Behavioral Archetypes (Clustering), Satisfaction Analysis, and Intervention Priority (KDD Step 7)."
+    },
+    'it': {
+        'default': "Sono Alex, il tuo esperto di analisi accademica. Mi occupo di modelli predittivi per la persistenza degli studenti e l'ottimizzazione delle performance.",
+        'greeting': "Saluti. Sono Alex. Analizzo pattern complessi per identificare segnali precoci di disallineamento accademico e rischio di abbandono (churn).",
+        'dashboard': "La Dashboard mostra i risultati in tempo reale del processo KDD. Monitora il 'Dropout Forecast': utilizza un algoritmo Random Forest per predire la probabilità di persistenza.",
+        'intervention_console': "Questa console segmenta gli studenti tramite scoring multi-fattore. Concentrati sui casi 'Critical' (>75% probabilità di churn) con calo nella frequenza esami.",
+        'student_360': "Student 360 utilizza il Clustering Comportamentale. Cerca segnali di 'Silent Burnout': studenti con ottimi voti ma bassi segnali di soddisfazione.",
+        'raw_data': "Il Data Explorer fornisce accesso diretto al layer analitico di BigQuery. Essenziale per verificare l'importanza delle feature o i punteggi psicometrici grezzi.",
+        'risk_high': "Rilevati fattori di rischio critici: drastico calo nelle interazioni Campus Lighthouse, scadenze d'esame saltate e bassi punteggi di flessibilità.",
+        'risk_low': "La probabilità di persistenza è alta. Questi studenti rientrano nell'archetipo 'Resilient': performance stabili anche sotto alta pressione accademica.",
+        'cluster_info': "L'apprendimento non supervisionato (K-Means) ha identificato 4 archetipi. Dagli 'Studenti Lavoratori' che necessitano flessibilità ai 'Social Learners' guidati dall'engagement.",
+        'satisfaction': "Il Satisfaction Predictor stima il benessere psicometrico. Un gap negativo tra soddisfazione reale e predetta spesso precede l'abbandono.",
+        'fallback': "Posso fornirti insight su: Segmentazione del Rischio (Churn), Archetipi Comportamentali (Clustering), Analisi della Soddisfazione e Priorità di Intervento (KDD Step 7)."
+    }
 }
+
+def _detect_chat_language(text: str) -> str:
+    """Detects if the input is likely Italian or English."""
+    it_keywords = ["ciao", "come", "perché", "quali", "rischio", "abbandono", "studente", "università", "esame", "voto"]
+    text_lower = text.lower()
+    if any(kw in text_lower for kw in it_keywords):
+        return "it"
+    return "en"
 
 def get_alex_response(message: str, current_page: str = "Dashboard") -> str:
     """
