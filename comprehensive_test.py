@@ -79,7 +79,7 @@ if __name__ == "__main__":
     a_pk = audit_streamlit_callbacks()
     
     if s_pk and l_pk and a_pk:
-        print("\n🏆 COMPREHENSIVE TEST PASSED!")
+        print("\n[SUCCESS] COMPREHENSIVE TEST PASSED!")
     else:
-        print("\n❌ TEST FAILED - CHECK LOGS ABOVE")
+        print("\n[FAILURE] TEST FAILED - CHECK LOGS ABOVE")
         sys.exit(1)
