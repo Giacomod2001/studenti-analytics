@@ -36,28 +36,54 @@ _ALEX_RESPONSES = {
         'cluster_info': "L'apprendimento non supervisionato (K-Means) ha identificato 4 archetipi. Dagli 'Studenti Lavoratori' che necessitano flessibilità ai 'Social Learners' guidati dall'engagement.",
         'satisfaction': "Il Satisfaction Predictor stima il benessere psicometrico. Un gap negativo tra soddisfazione reale e predetta spesso precede l'abbandono.",
         'fallback': "Posso fornirti insight su: Segmentazione del Rischio (Churn), Archetipi Comportamentali (Clustering), Analisi della Soddisfazione e Priorità di Intervento (KDD Step 7)."
+    },
+    'es': {
+        'default': "Soy Alex, tu experto en análisis académico. Me especializo en modelos predictivos para la persistencia estudiantil y optimización del rendimiento.",
+        'greeting': "Saludos. Soy Alex. Analizo patrones complejos para identificar señales tempranas de desvinculación académica y riesgo de abandono (churn).",
+        'dashboard': "El Panel de Control muestra resultados en tiempo real del proceso KDD. Monitorea el 'Dropout Forecast'—utiliza Random Forest para predecir la persistencia.",
+        'intervention_console': "Esta consola segmenta a los estudiantes mediante puntuación multifactorial. Enfócate en casos 'Críticos' (>75% de riesgo) con baja frecuencia de exámenes.",
+        'student_360': "Student 360 usa Modelado de Comportamiento. Busca el 'Silent Burnout'—estudiantes con notas altas pero baja satisfacción.",
+        'raw_data': "Data Explorer da acceso a la capa analítica de BigQuery. Esencial para auditar la importancia de las variables o puntuaciones psicométricas.",
+        'risk_high': "Riesgo crítico: caída drástica en interacciones en el campus, falta a exámenes y baja flexibilidad reportada.",
+        'risk_low': "Probabilidad de persistencia alta. Estos estudiantes son del arquetipo 'Resilient'—estables bajo presión académica.",
+        'cluster_info': "K-Means identificó 4 arquetipos: desde 'Estudiantes Trabajadores' hasta 'Social Learners' impulsados por el compromiso.",
+        'satisfaction': "Satisfaction Predictor estima el bienestar. Una brecha negativa entre satisfacción real y predicha suele preceder al abandono.",
+        'fallback': "Puedo darte insights sobre: Segmentación de Riesgo, Arquetipos, Análisis de Satisfacción y Prioridad de Intervención."
+    },
+    'fr': {
+        'default': "Je suis Alex, votre expert en analyse académique. Je me spécialise dans la modélisation prédictive de la persévérance scolaire.",
+        'greeting': "Salutations. Je suis Alex. J'analyse les schémas de données complexes pour identifier les signes précoces de décrochage (churn).",
+        'dashboard': "Le Tableau de Bord affiche les résultats du processus KDD. Surveillez le 'Dropout Forecast'—il utilise Random Forest pour prédire la persévérance.",
+        'intervention_console': "Cette console segmente les étudiants par score multifactoriel. Ciblez les cas 'Critiques' (>75% de risque) avec une baisse de fréquence d'examens.",
+        'student_360': "Student 360 utilise le Clustering Comportamentale. Cherchez le 'Silent Burnout'—étudiants avec de bonnes notes mais une faible satisfaction.",
+        'raw_data': "Data Explorer donne accès à la couche analytique BigQuery. Essentiel pour auditer l'importance des variables ou les scores psychométriques.",
+        'risk_high': "Risque critique : chute des interactions sur le campus, examens manqués et faibles scores de flexibilité.",
+        'risk_low': "Probabilité de persévérance élevée. Étudiants de type 'Résilient'—stables même sous pression académique.",
+        'cluster_info': "K-Means a identifié 4 archétypes : des 'Étudiants Salariés' aux 'Apprenants Sociaux' motivés par l'engagement.",
+        'satisfaction': "Satisfaction Predictor estime le bien-être. Un écart négatif entre satisfaction réelle et prédite précède souvent le décrochage.",
+        'fallback': "Je peux vous éclairer sur : la Segmentation des Risques, les Archétypes, l'Analyse de Satisfaction et les Priorités d'Intervention."
     }
 }
 
 def _detect_chat_language(text: str) -> str:
-    """Detects if the input is likely Italian or English."""
-    it_keywords = ["ciao", "come", "perché", "quali", "rischio", "abbandono", "studente", "università", "esame", "voto"]
+    """Detects if the input is likely Italian, Spanish, French or English."""
+    langs = {
+        'it': ["ciao", "come", "perché", "quali", "rischio", "abbandono", "studente", "università", "esame", "voto"],
+        'es': ["hola", "como", "porque", "riesgo", "abandono", "estudiante", "universidad", "examen", "nota"],
+        'fr': ["salut", "comment", "pourquoi", "risque", "abandon", "étudiant", "université", "examen", "note"]
+    }
     text_lower = text.lower()
-    if any(kw in text_lower for kw in it_keywords):
-        return "it"
+    for lang, keywords in langs.items():
+        if any(kw in text_lower for kw in keywords):
+            return lang
     return "en"
 
-def get_alex_response(message: str, current_page: str = "Dashboard") -> str:
+def get_alex_response(message: str, current_page: str = "Dashboard", lang: str = "en") -> str:
     """
-    Alex AI Academic Learning Expert - returns contextual responses.
+    Alex AI Academic Learning Expert - returns contextual responses in specified language.
+    """
+    responses = _ALEX_RESPONSES.get(lang, _ALEX_RESPONSES['en'])
     
-    Args:
-        message: User's input message
-        current_page: Current page/view name
-        
-    Returns:
-        Contextual response string
-    """
     if not message:
         # Map current_page to response key
         page_map = {
@@ -66,46 +92,42 @@ def get_alex_response(message: str, current_page: str = "Dashboard") -> str:
             "Student 360": "student_360",
             "Raw Data Explorer": "raw_data"
         }
-        return _ALEX_RESPONSES.get(page_map.get(current_page, "default"), _ALEX_RESPONSES['default'])
+        return responses.get(page_map.get(current_page, "default"), responses['default'])
     
     msg_lower = message.lower()
     
-    # Greeting detection (whole word matching)
+    # 1. Greetings
     tokens = msg_lower.split()
-    if any(kw in tokens for kw in ["hi", "hello", "hey", "ciao"]) or "help" in msg_lower:
-        return _ALEX_RESPONSES['greeting']
+    greetings = ["hi", "hello", "hey", "ciao", "buongiorno", "hola", "salut", "bonjour"]
+    if any(kw in tokens for kw in greetings) or any(kw in msg_lower for kw in ["help", "aiuto", "ayuda", "aide"]):
+        return responses['greeting']
     
-    # Risk-related questions
-    if any(kw in msg_lower for kw in ["risk", "dropout", "churn", "critical", "intervention", "pericolo"]):
-        if any(kw in msg_lower for kw in ["high", "critical", "danger", "critico"]):
-            return "High-risk signals often correlate with a >40% decrease in Campus Lighthouse activity. Check the 'Silent Burnout' segment—these students have stable grades but zero recent logins."
-        elif any(kw in msg_lower for kw in ["low", "safe", "stable", "sicuro"]):
-            return "Low-risk students demonstrate 'Academic Resilience'. They typically have a 100% exam submission rate. Consider them for the Mentorship Pilot Program."
-        return "The Intervention Console segments risk using a Random Forest model. It weights 'Time since last login' as the #1 predictor for undergraduate persistence."
+    # 2. Risk & Churn
+    if any(kw in msg_lower for kw in ["risk", "dropout", "churn", "critical", "intervention", "pericolo", "rischio", "abbandono", "riesgo", "abandon", "risque"]):
+        if any(kw in msg_lower for kw in ["high", "critical", "danger", "critico", "pericoloso", "peligro", "dangereux"]):
+            return responses['risk_high']
+        elif any(kw in msg_lower for kw in ["low", "safe", "stable", "sicuro", "tranquillo", "seguro", "estable", "stable"]):
+            return responses['risk_low']
+        return responses['intervention_console']
     
-    # Cluster-related questions
-    if any(kw in msg_lower for kw in ["cluster", "segment", "group", "archetype", "behavior", "comportamento"]):
-        return "Unsupervised K-Means clustering has identified 4 archetypes. The most vulnerable is the 'Disengaged' cluster, showing 3.2x higher churn probability than 'High Achievers'."
+    # 3. Clustering
+    if any(kw in msg_lower for kw in ["cluster", "segment", "group", "archetype", "behavior", "comportamento", "gruppo", "archetipo", "comportamiento", "groupe", "archétype"]):
+        return responses['cluster_info']
     
-    # Satisfaction-related questions
-    if any(kw in msg_lower for kw in ["satisfaction", "happy", "burnout", "experience", "quality", "soddisfazione"]):
-        return "We predict satisfaction using a Gradient Boosted Tree. A 'Psychometric Gap' (Predicted vs Actual) > 2.0 is a leading indicator of social isolation on campus."
+    # 4. Satisfaction & Burnout
+    if any(kw in msg_lower for kw in ["satisfaction", "happy", "burnout", "experience", "quality", "soddisfazione", "felice", "esperienza", "satisfacción", "experiencia", "qualité"]):
+        return responses['satisfaction']
     
-    # BigQuery / Data questions
-    if any(kw in msg_lower for kw in ["data", "bigquery", "query", "sql", "source", "origine"]):
-        return "Data is ingested from BigQuery's `analytics_studenti` dataset. We process Lighthouse logs, Exam Registry, and Psychometric Survey tables for real-time inference."
+    # 5. Data & BigQuery
+    if any(kw in msg_lower for kw in ["data", "bigquery", "query", "sql", "source", "origine", "dati", "datos", "données"]):
+        return responses['raw_data']
 
     # Page-specific fallbacks
-    if "control" in msg_lower or "tower" in msg_lower or "kpi" in msg_lower:
-        return _ALEX_RESPONSES['dashboard']
+    if any(kw in msg_lower for kw in ["dashboard", "control", "tower", "kpi"]): return responses['dashboard']
+    if any(kw in msg_lower for kw in ["console", "action", "intervento", "intervención", "intervention"]): return responses['intervention_console']
+    if any(kw in msg_lower for kw in ["360", "profile", "profilo", "perfil", "profil"]): return responses['student_360']
     
-    if "console" in msg_lower or "action" in msg_lower:
-        return _ALEX_RESPONSES['intervention_console']
-    
-    if "360" in msg_lower or "profile" in msg_lower:
-        return _ALEX_RESPONSES['student_360']
-    
-    return _ALEX_RESPONSES['fallback']
+    return responses['fallback']
 
 
 # =============================================================================
@@ -115,12 +137,6 @@ def get_alex_response(message: str, current_page: str = "Dashboard") -> str:
 def categorize_risk(percentage: float) -> Tuple[str, str]:
     """
     Categorizes a churn percentage into risk tier and color.
-    
-    Args:
-        percentage: Churn probability (0-100)
-        
-    Returns:
-        Tuple of (category_name, color_hex)
     """
     if percentage >= 75:
         return ("Critical", "#FF7B72")
@@ -133,12 +149,6 @@ def categorize_risk(percentage: float) -> Tuple[str, str]:
 def get_intervention_recommendation(risk_category: str) -> str:
     """
     Returns intervention recommendation based on risk category.
-    
-    Args:
-        risk_category: One of 'Critical', 'Monitor', 'Safe'
-        
-    Returns:
-        Recommendation text
     """
     recommendations = {
         "Critical": "Immediate advisor intervention required. Prioritize students with decreasing exam trends.",
@@ -155,12 +165,6 @@ def get_intervention_recommendation(risk_category: str) -> str:
 def get_cluster_description(cluster_id: int) -> str:
     """
     Returns human-readable description for a cluster.
-    
-    Args:
-        cluster_id: The K-means cluster ID (1-4)
-        
-    Returns:
-        Cluster archetype description
     """
     archetypes = {
         1: "High Achievers - Strong academic performance, high engagement",
@@ -174,12 +178,6 @@ def get_cluster_description(cluster_id: int) -> str:
 def analyze_cluster_risk(df: pd.DataFrame) -> Dict:
     """
     Analyzes risk distribution across clusters.
-    
-    Args:
-        df: DataFrame with 'cluster' and 'churn_percentage' columns
-        
-    Returns:
-        Dict with cluster risk statistics
     """
     if df.empty or 'cluster' not in df.columns or 'churn_percentage' not in df.columns:
         return {}
@@ -195,13 +193,6 @@ def analyze_cluster_risk(df: pd.DataFrame) -> Dict:
 def classify_psychometric_status(real_score: float, predicted_score: float) -> str:
     """
     Classifies student psychometric status based on satisfaction gap.
-    
-    Args:
-        real_score: Actual reported satisfaction
-        predicted_score: Model-predicted satisfaction
-        
-    Returns:
-        Status category
     """
     gap = real_score - predicted_score
     
@@ -218,12 +209,6 @@ def classify_psychometric_status(real_score: float, predicted_score: float) -> s
 def get_psychometric_insight(status: str) -> str:
     """
     Returns insight text for a psychometric status.
-    
-    Args:
-        status: One of 'Silent Burnout', 'Resilient', 'At Risk', 'Aligned'
-        
-    Returns:
-        Insight description
     """
     insights = {
         "Silent Burnout": "High academic performance but emotionally exhausted. Risk of sudden dropout. Ask about stress management.",
@@ -246,15 +231,6 @@ def generate_executive_summary(
 ) -> str:
     """
     Generates an executive summary for the Dashboard.
-    
-    Args:
-        total_students: Total student population
-        critical_count: Count of critical risk students
-        avg_satisfaction: Average satisfaction score
-        model_confidence: Model confidence percentage
-        
-    Returns:
-        HTML formatted summary
     """
     risk_rate = (critical_count / total_students * 100) if total_students > 0 else 0
     
