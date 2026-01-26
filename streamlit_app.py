@@ -540,13 +540,11 @@ def main():
                 st.cache_data.clear()
                 st.rerun()
             
-            # ADA AI ASSISTANT
+            # ALEX AI ASSISTANT - PREMIUM UI
             st.markdown("---")
-            st.markdown("""
-            <div class="sidebar-chat-container">
-                <div class="sidebar-chat-header">Alex - Academic Advisor</div>
-            </div>
-            """, unsafe_allow_html=True)
+            
+            if "chat_history" not in st.session_state:
+                st.session_state["chat_history"] = []
             
             # Get current view name for context
             view_names = {
@@ -556,18 +554,41 @@ def main():
                 'raw_data': 'Raw Data Explorer'
             }
             current_view = view_names.get(st.session_state.get('view', 'dashboard'), 'Dashboard')
-            
-            # Chat input
-            user_msg = st.text_input("Ask Alex...", key="ada_input", placeholder="How does risk scoring work?")
-            
-            # Get response
-            ada_response = ml_utils.get_alex_response(user_msg, current_view)
-            
+
+            # Define Callback
+            def process_alex_chat():
+                msg = st.session_state.get("alex_input_widget", "")
+                if msg:
+                    st.session_state["chat_history"].append({"role": "user", "content": msg})
+                    resp = ml_utils.get_alex_response(msg, current_view)
+                    st.session_state["chat_history"].append({"role": "assistant", "content": resp})
+                    st.session_state["alex_input_widget"] = ""
+                    st.rerun()
+
+            # Display last message or welcome
+            assistant_msgs = [m for m in st.session_state["chat_history"] if m["role"] == "assistant"]
+            if not assistant_msgs:
+                display_msg = ml_utils.get_alex_response("", current_view)
+            else:
+                display_msg = assistant_msgs[-1]["content"]
+
             st.markdown(f"""
-            <div class="sidebar-chat-message">
-                {ada_response}
+            <div class="sidebar-chat-container">
+                <div class="sidebar-chat-header">Alex AI Consultant</div>
+                <div class="sidebar-chat-message">
+                    {display_msg}
+                </div>
             </div>
             """, unsafe_allow_html=True)
+            
+            # Chat input
+            st.text_input(
+                "Ask Alex...", 
+                key="alex_input_widget", 
+                placeholder="How to reduce churn?",
+                label_visibility="collapsed",
+                on_change=process_alex_chat
+            )
     
         # ROUTING LOGIC
         view = st.session_state['view']

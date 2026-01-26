@@ -294,40 +294,35 @@ hr {
 }
 
 /* =============================================================================
-   ADA AI ASSISTANT UI
+   ALEX AI ASSISTANT UI (Premium Vision)
    ============================================================================= */
 
 .sidebar-chat-container {
-    margin-top: 2rem;
-    padding: 1.5rem;
-    background: rgba(0, 119, 181, 0.08);
-    border: 1px solid rgba(0, 119, 181, 0.4);
-    border-radius: 16px;
-    box-shadow: inset 0 0 25px rgba(0, 119, 181, 0.08);
-    margin-bottom: 1.5rem;
+    margin-top: 1rem;
+    padding: 1.25rem;
+    background: rgba(0, 119, 181, 0.05);
+    border: 1px solid rgba(0, 119, 181, 0.3);
+    border-radius: 12px;
+    margin-bottom: 1rem;
 }
 
 .sidebar-chat-header {
-    font-size: 1rem;
-    font-weight: 800;
+    font-size: 1.05rem;
+    font-weight: 700;
     color: #00C9A7 !important;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 1rem;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
     border-bottom: 1px solid rgba(0, 201, 167, 0.2);
-    padding-bottom: 8px;
 }
 
 .sidebar-chat-message {
     background: #1c2128;
     color: #f0f6fc;
-    border: 1px solid #444c56;
-    padding: 16px 22px;
-    border-radius: 18px;
+    border: 1px solid #30363d;
+    padding: 1.25rem;
+    border-radius: 12px;
     font-size: 0.95rem;
     line-height: 1.6;
-    margin-top: 1rem;
     box-shadow: var(--shadow-sm);
 }
 
