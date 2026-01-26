@@ -71,13 +71,18 @@ def render_dashboard():
     sat_score = data_utils.get_avg_satisfaction()
     
     # 1. TOP ROW: CRITICAL METRICS
+    st.markdown("<div style='margin-bottom: 1.5rem;'></div>", unsafe_allow_html=True)
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Active Students", f"{risk_counts.get('total', 0):,}", "+2.5%")
-    c2.metric("Dropout Forecast", f"{risk_counts.get('critical', 0):,}", "Critical", delta_color="inverse")
-    c3.metric("Avg Satisfaction", f"{sat_score:.1f}", "Stable")
-    c4.metric("Model Confidence", "94.2%", "+0.8%")
+    with c1:
+        st.metric("Active Students", f"{risk_counts.get('total', 0):,}", "+2.5%")
+    with c2:
+        st.metric("Dropout Forecast", f"{risk_counts.get('critical', 0):,}", "Critical", delta_color="inverse")
+    with c3:
+        st.metric("Avg Satisfaction", f"{sat_score:.1f}", "Stable")
+    with c4:
+        st.metric("Model Confidence", "94.2%", "+0.8%")
     
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("<div style='margin: 2rem 0;'></div>", unsafe_allow_html=True)
     
     # 2. MAIN SPLIT: INTERVENTION vs STRATEGY
     col_risk, col_opp = st.columns(2)
@@ -521,6 +526,12 @@ def main():
             
             if st.button("Raw Data Explorer", use_container_width=True):
                 st.session_state['view'] = 'raw_data'
+                st.rerun()
+            
+            st.markdown("---")
+            st.caption("SYSTEM")
+            if st.button("🔄 Refresh Data Cache", use_container_width=True):
+                st.cache_data.clear()
                 st.rerun()
             
             # ADA AI ASSISTANT

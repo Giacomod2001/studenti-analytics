@@ -57,8 +57,8 @@ footer {visibility: hidden;}
    ============================================================================= */
 h1, h2, h3, h4, h5, h6 {
     font-weight: 600 !important;
-    margin-top: 0.5rem !important;
-    margin-bottom: 0.5rem !important;
+    margin-top: 1.5rem !important;
+    margin-bottom: 1rem !important;
 }
 
 h1 {
@@ -94,14 +94,15 @@ h1 {
    ============================================================================= */
    
 .glass-card {
-    background: rgba(22, 27, 34, 0.8);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(48, 54, 61, 0.6);
-    border-radius: 12px;
-    padding: 1.5rem;
+    background: rgba(22, 27, 34, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(48, 54, 61, 0.7);
+    border-radius: 16px;
+    padding: 2rem;
     box-shadow: var(--shadow-md);
     transition: all var(--transition-normal);
+    margin-bottom: 1.5rem;
 }
 
 .glass-card:hover {
@@ -249,7 +250,7 @@ hr {
     border: none;
     height: 1px;
     background: linear-gradient(90deg, transparent, var(--border-color), var(--primary-blue), var(--border-color), transparent);
-    margin: 2rem 0;
+    margin: 3rem 0;
 }
 
 /* =============================================================================
@@ -297,33 +298,37 @@ hr {
    ============================================================================= */
 
 .sidebar-chat-container {
-    margin-top: 1.5rem;
-    padding: 1.25rem;
-    background: rgba(0, 119, 181, 0.05);
-    border: 1px solid rgba(0, 119, 181, 0.3);
-    border-radius: 12px;
-    box-shadow: inset 0 0 20px rgba(0, 119, 181, 0.05);
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background: rgba(0, 119, 181, 0.08);
+    border: 1px solid rgba(0, 119, 181, 0.4);
+    border-radius: 16px;
+    box-shadow: inset 0 0 25px rgba(0, 119, 181, 0.08);
+    margin-bottom: 1.5rem;
 }
 
 .sidebar-chat-header {
-    font-size: 0.9rem;
+    font-size: 1rem;
     font-weight: 800;
     color: #00C9A7 !important;
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-bottom: 0.6rem;
+    gap: 10px;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid rgba(0, 201, 167, 0.2);
+    padding-bottom: 8px;
 }
 
 .sidebar-chat-message {
-    background: #0d1117;
+    background: #1c2128;
     color: #f0f6fc;
     border: 1px solid #444c56;
-    padding: 14px 20px;
-    border-radius: 20px;
-    font-size: 0.9rem;
-    line-height: 1.5;
-    margin-bottom: 0.75rem;
+    padding: 16px 22px;
+    border-radius: 18px;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin-top: 1rem;
+    box-shadow: var(--shadow-sm);
 }
 
 /* =============================================================================
