@@ -13,7 +13,7 @@ from typing import Dict, List, Tuple
 _ALEX_RESPONSES = {
     'default': "I am Alex, your Academic Learning Expert. I can help you understand student analytics, risk predictions, and retention strategies.",
     'greeting': "Hello! I am Alex, your AI consultant for student retention. I analyze patterns in academic data to help you make data-driven decisions.",
-    'control_tower': "The Control Tower shows your key performance indicators. Focus on the Dropout Forecast metric - this uses a Random Forest model to predict at-risk students.",
+    'dashboard': "The Dashboard shows your key performance indicators. Focus on the Dropout Forecast metric - this uses a Random Forest model to predict at-risk students.",
     'intervention_console': "The Intervention Console segments students by risk level. Critical (>75%) students need immediate attention - consider scheduling counseling sessions.",
     'student_360': "Student 360 provides holistic profiling. The behavioral clusters identify distinct student archetypes. Look for 'Silent Burnout' cases - high performers with low satisfaction.",
     'raw_data': "The Raw Data Explorer gives you direct access to BigQuery tables. Use this for custom analysis or data auditing.",
@@ -24,7 +24,7 @@ _ALEX_RESPONSES = {
     'fallback': "I can help you with: risk analysis, student clustering, satisfaction metrics, and intervention strategies. What would you like to know?"
 }
 
-def get_alex_response(message: str, current_page: str = "Control Tower") -> str:
+def get_alex_response(message: str, current_page: str = "Dashboard") -> str:
     """
     Alex AI Academic Learning Expert - returns contextual responses.
     
@@ -38,7 +38,7 @@ def get_alex_response(message: str, current_page: str = "Control Tower") -> str:
     if not message:
         # Map current_page to response key
         page_map = {
-            "Control Tower": "control_tower",
+            "Dashboard": "dashboard",
             "Intervention Console": "intervention_console", 
             "Student 360": "student_360",
             "Raw Data Explorer": "raw_data"
@@ -69,7 +69,7 @@ def get_alex_response(message: str, current_page: str = "Control Tower") -> str:
     
     # Page-specific fallbacks
     if "control" in msg_lower or "tower" in msg_lower or "kpi" in msg_lower:
-        return _ALEX_RESPONSES['control_tower']
+        return _ALEX_RESPONSES['dashboard']
     
     if "console" in msg_lower or "action" in msg_lower:
         return _ALEX_RESPONSES['intervention_console']
@@ -220,7 +220,7 @@ def generate_executive_summary(
     model_confidence: float = 94.2
 ) -> str:
     """
-    Generates an executive summary for the Control Tower.
+    Generates an executive summary for the Dashboard.
     
     Args:
         total_students: Total student population

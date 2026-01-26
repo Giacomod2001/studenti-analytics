@@ -1,3 +1,8 @@
+# =============================================================================
+# DATA_UTILS.PY - Optimized BigQuery Data Loading
+# Version 2.0 - Performance Optimized
+# =============================================================================
+
 import streamlit as st
 import pandas as pd
 from google.cloud import bigquery
@@ -7,29 +12,27 @@ import constants
 
 logger = logging.getLogger(__name__)
 
+# =============================================================================
+# BIGQUERY CLIENT (Cached - never expires)
+# =============================================================================
+
 @st.cache_resource
 def get_bigquery_client():
-    """
-    Initializes and caches the BigQuery client.
-    Uses cache_resource because the client is a non-serializable object (connection).
-    """
+    """Initializes and caches the BigQuery client."""
     try:
-        credentials_dict = dict(st.secrets)
-        
-        if "private_key" in st.secrets:
-             credentials_dict = {
-                "type": st.secrets.get("type"),
-                "project_id": st.secrets.get("project_id"),
-                "private_key_id": st.secrets.get("private_key_id"),
-                "private_key": st.secrets.get("private_key"),
-                "client_email": st.secrets.get("client_email"),
-                "client_id": st.secrets.get("client_id"),
-                "auth_uri": st.secrets.get("auth_uri"),
-                "token_uri": st.secrets.get("token_uri"),
-                "auth_provider_x509_cert_url": st.secrets.get("auth_provider_x509_cert_url"),
-                "client_x509_cert_url": st.secrets.get("client_x509_cert_url"),
-                "universe_domain": st.secrets.get("universe_domain")
-            }
+        credentials_dict = {
+            "type": st.secrets.get("type"),
+            "project_id": st.secrets.get("project_id"),
+            "private_key_id": st.secrets.get("private_key_id"),
+            "private_key": st.secrets.get("private_key"),
+            "client_email": st.secrets.get("client_email"),
+            "client_id": st.secrets.get("client_id"),
+            "auth_uri": st.secrets.get("auth_uri"),
+            "token_uri": st.secrets.get("token_uri"),
+            "auth_provider_x509_cert_url": st.secrets.get("auth_provider_x509_cert_url"),
+            "client_x509_cert_url": st.secrets.get("client_x509_cert_url"),
+            "universe_domain": st.secrets.get("universe_domain")
+        }
         
         credentials = service_account.Credentials.from_service_account_info(credentials_dict)
         client = bigquery.Client(credentials=credentials, project=constants.PROJECT_ID)
@@ -39,11 +42,13 @@ def get_bigquery_client():
         logger.error(f"Error initializing BQ client: {e}")
         return None
 
-@st.cache_data(ttl=600, show_spinner=False)
+# =============================================================================
+# TABLE METADATA (Cached 1 hour)
+# =============================================================================
+
+@st.cache_data(ttl=3600, show_spinner=False)
 def get_tables_metadata_cached():
-    """
-    Retrieves table metadata.
-    """
+    """Retrieves table metadata - cached for 1 hour."""
     client = get_bigquery_client()
     if not client:
         return []
@@ -69,49 +74,85 @@ def get_tables_metadata_cached():
         return sorted(tables_info, key=lambda x: x["id"])
     except Exception as e:
         st.error(f"Error retrieving metadata: {e}")
-        logger.error(f"Error metadata: {e}")
         return []
 
-@st.cache_data(ttl=600, show_spinner=False)
-def load_table_data_optimized(table_id: str):
+# =============================================================================
+# OPTIMIZED DATA LOADING (Cached 30 min, with LIMIT)
+# =============================================================================
+
+@st.cache_data(ttl=1800, show_spinner="Loading data...")
+def load_table_data_optimized(table_id: str, limit: int = 10000):
     """
-    Loads data optimizing types for Arrow/Streamlit.
+    Loads data with automatic LIMIT for performance.
+    
+    Args:
+        table_id: BigQuery table name
+        limit: Max rows to load (default 10,000)
     """
     client = get_bigquery_client()
     if not client:
         return pd.DataFrame()
 
     try:
-        query = f"SELECT * FROM `{constants.PROJECT_ID}.{constants.DATASET_ID}.{table_id}`"
+        # Apply LIMIT for faster loading
+        query = f"SELECT * FROM `{constants.PROJECT_ID}.{constants.DATASET_ID}.{table_id}` LIMIT {limit}"
         
-        # Attempt 1: BQ Storage API (fast)
-        try:
-            df = client.query(query).to_dataframe()
-        except Exception as e_fast:
-            logger.warning(f"Fast loading failed for {table_id}: {e_fast}")
-            # Attempt 2: REST API standard
-            try:
-                df = client.query(query).to_dataframe(create_bqstorage_client=False)
-            except Exception as e_rest:
-                logger.warning(f"REST loading failed for {table_id}: {e_rest}")
-                # Attempt 3: Manual (slow but safe, doesn't require db-dtypes)
-                try:
-                    job = client.query(query)
-                    rows = [dict(row) for row in job.result()]
-                    df = pd.DataFrame(rows)
-                except Exception as e_manual:
-                    raise e_manual
+        # Fast path: standard query
+        df = client.query(query).to_dataframe(create_bqstorage_client=False)
 
-        # Type optimization to reduce memory and improve Arrow compatibility
+        # Optimize memory with category types
         if not df.empty:
             for col in df.select_dtypes(include=['object']).columns:
-                num_unique = df[col].nunique()
-                num_total = len(df)
-                if num_total > 0 and num_unique / num_total < 0.5:
+                if df[col].nunique() / len(df) < 0.5:
                     df[col] = df[col].astype('category')
                 
         return df
     except Exception as e:
-        st.error(f"Error loading data {table_id}: {e}")
-        logger.error(f"Error loading data {table_id}: {e}")
+        logger.error(f"Error loading {table_id}: {e}")
         return pd.DataFrame()
+
+# =============================================================================
+# LIGHTWEIGHT QUERIES (For Dashboard KPIs)
+# =============================================================================
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def get_risk_counts():
+    """Fast query for risk tier counts only."""
+    client = get_bigquery_client()
+    if not client:
+        st.error("BigQuery client not initialized")
+        return {"critical": 0, "monitor": 0, "safe": 0, "total": 0}
+    
+    try:
+        query = f"""
+        SELECT 
+            COUNTIF(churn_percentage >= 75) as critical,
+            COUNTIF(churn_percentage >= 35 AND churn_percentage < 75) as monitor,
+            COUNTIF(churn_percentage < 35) as safe,
+            COUNT(*) as total
+        FROM `{constants.PROJECT_ID}.{constants.DATASET_ID}.studenti_churn_pred`
+        """
+        result = client.query(query).to_dataframe(create_bqstorage_client=False)
+        return result.iloc[0].to_dict() if not result.empty else {"critical": 0, "monitor": 0, "safe": 0, "total": 0}
+    except Exception as e:
+        logger.error(f"get_risk_counts error: {e}")
+        st.error(f"BigQuery error: {e}")
+        return {"critical": 0, "monitor": 0, "safe": 0, "total": 0}
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def get_avg_satisfaction():
+    """Fast query for average satisfaction only."""
+    client = get_bigquery_client()
+    if not client:
+        return 0.0
+    
+    try:
+        query = f"""
+        SELECT AVG(soddisfazione_predetta) as avg_sat
+        FROM `{constants.PROJECT_ID}.{constants.DATASET_ID}.report_finale_soddisfazione_studenti`
+        """
+        result = client.query(query).to_dataframe(create_bqstorage_client=False)
+        return float(result.iloc[0]['avg_sat']) if not result.empty else 0.0
+    except Exception as e:
+        logger.error(f"get_avg_satisfaction error: {e}")
+        return 0.0

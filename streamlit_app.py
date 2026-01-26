@@ -60,27 +60,20 @@ def generate_smart_report(df: pd.DataFrame, context: str) -> str:
 
 # ─── 3) VIEW: CONTROL TOWER (HOME) ─────────────────────────────────────────
 
-def render_control_tower():
-    st.title("Control Tower")
+def render_dashboard():
+    st.title("Dashboard")
     st.markdown("High-level academic performance indicators.")
+    st.caption("Need help understanding these metrics? Ask **Alex** in the sidebar.")
     st.markdown("---")
     
-    # Load Key Data
-    try:
-        df_churn = data_utils.load_table_data_optimized("studenti_churn_pred")
-        df_sat = data_utils.load_table_data_optimized("report_finale_soddisfazione_studenti")
-    except:
-        df_churn = pd.DataFrame()
-        df_sat = pd.DataFrame()
-
-    # Calculate KPIs
-    risk_n = len(df_churn[df_churn['churn_percentage'] > 70]) if not df_churn.empty and 'churn_percentage' in df_churn.columns else 0
-    sat_score = df_sat['soddisfazione_predetta'].mean() if not df_sat.empty and 'soddisfazione_predetta' in df_sat.columns else 0
+    # Load KPIs with lightweight queries (FAST)
+    risk_counts = data_utils.get_risk_counts()
+    sat_score = data_utils.get_avg_satisfaction()
     
     # 1. TOP ROW: CRITICAL METRICS
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Active Students", "50,000", "+2.5%")
-    c2.metric("Dropout Forecast", f"{risk_n:,}", "Critical", delta_color="inverse")
+    c1.metric("Active Students", f"{risk_counts.get('total', 0):,}", "+2.5%")
+    c2.metric("Dropout Forecast", f"{risk_counts.get('critical', 0):,}", "Critical", delta_color="inverse")
     c3.metric("Avg Satisfaction", f"{sat_score:.1f}", "Stable")
     c4.metric("Model Confidence", "94.2%", "+0.8%")
     
@@ -93,16 +86,20 @@ def render_control_tower():
         st.subheader("Priority Intervention Queue")
         st.markdown("*Students requiring immediate attention based on Churn Risk > 80%*")
         
-        if not df_churn.empty:
+        # Lazy load only when needed for table display
+        df_churn = data_utils.load_table_data_optimized("studenti_churn_pred", limit=1000)
+        
+        if not df_churn.empty and 'churn_percentage' in df_churn.columns:
             high_risk_df = df_churn[df_churn['churn_percentage'] > 80].sort_values(by='churn_percentage', ascending=False).head(5)
-            st.dataframe(
-                high_risk_df[['student_id', 'churn_percentage', 'categoria_rischio']], 
-                use_container_width=True,
-                column_config={
-                    "churn_percentage": st.column_config.ProgressColumn("Risk", min_value=0, max_value=100, format="%.0f%%")
-                },
-                hide_index=True
-            )
+            if not high_risk_df.empty:
+                st.dataframe(
+                    high_risk_df[['student_id', 'churn_percentage', 'categoria_rischio']], 
+                    use_container_width=True,
+                    column_config={
+                        "churn_percentage": st.column_config.ProgressColumn("Risk", min_value=0, max_value=100, format="%.0f%%")
+                    },
+                    hide_index=True
+                )
             if st.button("Manage Interventions (Go to Console)"):
                 st.session_state['view'] = 'intervention_console'
                 st.rerun()
@@ -123,6 +120,16 @@ def render_control_tower():
 def render_intervention_console():
     st.title("Intervention Console")
     st.markdown("Monitor and act on attrition risks.")
+    st.caption("Need help with risk tiers? Ask **Alex** in the sidebar.")
+    
+    # Disclaimer sulla polarizzazione dei risultati
+    st.warning("""
+    **Note on Model Results:** The Random Forest predictions tend to show polarized distributions 
+    (students are often classified as either Safe or Critical, with fewer in the Monitor range). 
+    This is due to the model's confidence thresholds and training data characteristics. 
+    Always combine algorithmic scores with human judgment for intervention decisions.
+    """)
+    
     st.markdown("---")
     
     # Load Data
@@ -244,6 +251,7 @@ def render_intervention_console():
 def render_student_360():
     st.title("Student 360")
     st.markdown("Holistic profiling and behavioral segmentation.")
+    st.caption("Need help with clusters or psychometrics? Ask **Alex** in the sidebar.")
     st.markdown("---")
     
     tab_clusters, tab_satisfaction, tab_features = st.tabs(["Clustering", "Satisfaction", "Driver Analysis"])
@@ -403,7 +411,11 @@ def render_student_360():
     with tab_features:
         st.subheader("Model Explainability")
         df_feat = data_utils.load_table_data_optimized("feature_importance_studenti")
-        st.bar_chart(df_feat.set_index('caratteristica')['peso_importanza'], color="#da3633")
+        
+        if not df_feat.empty and 'caratteristica' in df_feat.columns and 'peso_importanza' in df_feat.columns:
+            st.bar_chart(df_feat.set_index('caratteristica')['peso_importanza'], color="#da3633")
+        else:
+            st.info("Feature importance data is currently unavailable for this model.")
         
 # ─── 6) LANDING PAGE ───────────────────────────────────────────────────────
 
@@ -451,7 +463,7 @@ def render_landing_page():
     st.markdown("""
     ### Getting Started
     
-    Use the navigation sidebar to access the **Control Tower** for a high-level overview, 
+    Use the navigation sidebar to access the **Dashboard** for a high-level overview, 
     or dive into the **Intervention Console** to take action on specific cases.
     
     **Alex**, your AI Academic Advisor, is available in the sidebar to answer questions 
@@ -460,7 +472,7 @@ def render_landing_page():
     
     st.markdown("<br>", unsafe_allow_html=True)
     
-    if st.button("Enter Control Tower", type="primary"):
+    if st.button("Enter Dashboard", type="primary"):
         st.session_state["show_landing"] = False
         st.rerun()
 
@@ -480,7 +492,7 @@ def main():
             return
     
         if 'view' not in st.session_state:
-            st.session_state['view'] = 'control_tower'
+            st.session_state['view'] = 'dashboard'
     
         # SIDEBAR NAVIGATION
         with st.sidebar:
@@ -489,8 +501,8 @@ def main():
             st.markdown("---")
             
             # NAVIGATION MENU
-            if st.button("Control Tower", use_container_width=True):
-                st.session_state['view'] = 'control_tower'
+            if st.button("Dashboard", use_container_width=True):
+                st.session_state['view'] = 'dashboard'
                 st.rerun()
                 
             st.markdown("---")
@@ -521,12 +533,12 @@ def main():
             
             # Get current view name for context
             view_names = {
-                'control_tower': 'Control Tower',
+                'dashboard': 'Dashboard',
                 'intervention_console': 'Intervention Console',
                 'student_360': 'Student 360',
                 'raw_data': 'Raw Data Explorer'
             }
-            current_view = view_names.get(st.session_state.get('view', 'control_tower'), 'Control Tower')
+            current_view = view_names.get(st.session_state.get('view', 'dashboard'), 'Dashboard')
             
             # Chat input
             user_msg = st.text_input("Ask Alex...", key="ada_input", placeholder="How does risk scoring work?")
@@ -543,8 +555,8 @@ def main():
         # ROUTING LOGIC
         view = st.session_state['view']
         
-        if view == 'control_tower':
-            render_control_tower()
+        if view == 'dashboard':
+            render_dashboard()
             
         elif view == 'intervention_console':
             render_intervention_console()
