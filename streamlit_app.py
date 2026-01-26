@@ -70,6 +70,8 @@ def render_dashboard():
     risk_counts = data_utils.get_risk_counts()
     sat_score = data_utils.get_avg_satisfaction()
     
+    st.markdown("<br>", unsafe_allow_html=True)
+    
     # 1. TOP ROW: CRITICAL METRICS
     st.markdown("<div style='margin-bottom: 1.5rem;'></div>", unsafe_allow_html=True)
     c1, c2, c3, c4 = st.columns(4)
@@ -82,7 +84,7 @@ def render_dashboard():
     with c4:
         st.metric("Model Confidence", "94.2%", "+0.8%")
     
-    st.markdown("<div style='margin: 2rem 0;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin: 4rem 0;'></div>", unsafe_allow_html=True)
     
     # 2. MAIN SPLIT: INTERVENTION vs STRATEGY
     col_risk, col_opp = st.columns(2)
@@ -114,6 +116,7 @@ def render_dashboard():
     with col_opp:
         st.subheader("Strategic Insights")
         st.markdown("*Performance trends and satisfaction drivers*")
+        st.markdown("<br>", unsafe_allow_html=True)
         st.info("Satisfaction is strongly correlated with 'Exam Frequency'. Increasing exam availability could boost CSAT by +0.5 points.")
         st.info("Cluster 2 (Working Students) shows highest churn risk. Suggest deploying flexible schedule reminders.")
 
