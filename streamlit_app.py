@@ -123,12 +123,11 @@ def render_dashboard():
 
 # ─── 4) VIEW: INTERVENTION CONSOLE (RISK) ──────────────────────────────────
 
-# ─── 4) VIEW: INTERVENTION CONSOLE (RISK) ──────────────────────────────────
-
 def render_intervention_console():
     st.title("Intervention Console")
     st.markdown("Monitor and act on attrition risks.")
     st.caption("Need help with risk tiers? Ask **Alex** in the sidebar.")
+    st.markdown("<br>", unsafe_allow_html=True)
     
     # Disclaimer sulla polarizzazione dei risultati
     st.warning("""
@@ -138,7 +137,9 @@ def render_intervention_console():
     Always combine algorithmic scores with human judgment for intervention decisions.
     """)
     
-    st.markdown("---")
+    st.markdown("<div style='margin-bottom: 2rem;'></div>", unsafe_allow_html=True)
+    st.divider()
+    st.markdown("<br>", unsafe_allow_html=True)
     
     # Load Data
     df = data_utils.load_table_data_optimized("studenti_churn_pred")
@@ -153,6 +154,8 @@ def render_intervention_console():
         n_total = len(df)
     else:
         n_crit, n_mon, n_safe, n_total = 0, 0, 0, 0
+        if df.empty:
+            st.info("💡 **Tip:** If you see no data, try clicking '🔄 Refresh Data Cache' in the sidebar to ensure a fresh connection to BigQuery.")
 
     # 1. FILTER BAR
     c1, c2 = st.columns([3, 1])

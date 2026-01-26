@@ -133,10 +133,12 @@ def get_risk_counts():
         FROM `{constants.PROJECT_ID}.{constants.DATASET_ID}.studenti_churn_pred`
         """
         result = client.query(query).to_dataframe(create_bqstorage_client=False)
+        if result.empty or result.iloc[0]['total'] == 0:
+            logger.warning("get_risk_counts returned 0 students. Check BigQuery tables.")
         return result.iloc[0].to_dict() if not result.empty else {"critical": 0, "monitor": 0, "safe": 0, "total": 0}
     except Exception as e:
         logger.error(f"get_risk_counts error: {e}")
-        st.error(f"BigQuery error: {e}")
+        st.error(f"BigQuery error (Risk Counts): {e}")
         return {"critical": 0, "monitor": 0, "safe": 0, "total": 0}
 
 @st.cache_data(ttl=1800, show_spinner=False)
