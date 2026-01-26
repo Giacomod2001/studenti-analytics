@@ -96,13 +96,7 @@ def get_alex_response(message: str, current_page: str = "Dashboard", lang: str =
     
     msg_lower = message.lower()
     
-    # 1. Greetings
-    tokens = msg_lower.split()
-    greetings = ["hi", "hello", "hey", "ciao", "buongiorno", "hola", "salut", "bonjour"]
-    if any(kw in tokens for kw in greetings) or any(kw in msg_lower for kw in ["help", "aiuto", "ayuda", "aide"]):
-        return responses['greeting']
-    
-    # 2. Risk & Churn
+    # 1. Risk & Churn (Priority)
     if any(kw in msg_lower for kw in ["risk", "dropout", "churn", "critical", "intervention", "pericolo", "rischio", "abbandono", "riesgo", "abandon", "risque"]):
         if any(kw in msg_lower for kw in ["high", "critical", "danger", "critico", "pericoloso", "peligro", "dangereux"]):
             return responses['risk_high']
@@ -110,17 +104,25 @@ def get_alex_response(message: str, current_page: str = "Dashboard", lang: str =
             return responses['risk_low']
         return responses['intervention_console']
     
-    # 3. Clustering
+    # 2. Clustering
     if any(kw in msg_lower for kw in ["cluster", "segment", "group", "archetype", "behavior", "comportamento", "gruppo", "archetipo", "comportamiento", "groupe", "archétype"]):
         return responses['cluster_info']
     
-    # 4. Satisfaction & Burnout
+    # 3. Satisfaction & Burnout
     if any(kw in msg_lower for kw in ["satisfaction", "happy", "burnout", "experience", "quality", "soddisfazione", "felice", "esperienza", "satisfacción", "experiencia", "qualité"]):
         return responses['satisfaction']
     
-    # 5. Data & BigQuery
+    # 4. Data & BigQuery
     if any(kw in msg_lower for kw in ["data", "bigquery", "query", "sql", "source", "origine", "dati", "datos", "données"]):
         return responses['raw_data']
+
+    # 5. Greetings (Fallback if no specific topic)
+    tokens = msg_lower.split()
+    greetings = ["hi", "hello", "hey", "ciao", "buongiorno", "hola", "salut", "bonjour"]
+    if any(kw in tokens for kw in greetings) or any(kw in msg_lower for kw in ["help", "aiuto", "ayuda", "aide"]):
+        return responses['greeting']
+    
+    # 6. Page-specific fallbacks
 
     # Page-specific fallbacks
     if any(kw in msg_lower for kw in ["dashboard", "control", "tower", "kpi"]): return responses['dashboard']
