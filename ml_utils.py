@@ -15,7 +15,7 @@ _ALEX_RESPONSES = {
         'default': "I am Alex, your Academic Learning Expert. I specialize in predictive modeling for student persistence and performance optimization.",
         'greeting': "Greetings. I'm Alex. I analyze complex student data patterns to identify early signs of academic disengagement and churn risk.",
         'dashboard': "The Control Tower displays real-time KDD process results. Monitor the 'Dropout Forecast'—it leverages a Random Forest ensemble to predict persistence probability.",
-        'intervention_console': "This console segments students using multi-factor risk scoring. Focus on 'Critical' students (>75% churn probability) who show declining exam frequency.",
+        'intervention_console': "This console segments students using multi-factor risk scoring. Focus on 'Critical' students (>75% churn probability) or use the dropout forecast to prioritize cases.",
         'student_360': "Student 360 uses Behavioral Clustering. Look for 'Silent Burnout'—students with high academic performance but critically low satisfaction signals.",
         'raw_data': "The Data Explorer provides direct access to the BigQuery analytical layer. Essential for auditing specific feature importance or raw psychometric scores.",
         'risk_high': "Critical risk factors detected: dramatic drop in campus lighthouse interactions, missing exam deadlines, and low self-reported flexibility scores.",
@@ -42,11 +42,11 @@ _ALEX_RESPONSES = {
         'greeting': "Saludos. Soy Alex. Analizo patrones complejos para identificar señales tempranas de desvinculación académica y riesgo de abandono (churn).",
         'dashboard': "El Panel de Control muestra resultados en tiempo real del proceso KDD. Monitorea el 'Dropout Forecast'—utiliza Random Forest para predecir la persistencia.",
         'intervention_console': "Esta consola segmenta a los estudiantes mediante puntuación multifactorial. Enfócate en casos 'Críticos' (>75% de riesgo) con baja frecuencia de exámenes.",
-        'student_360': "Student 360 usa Modelado de Comportamiento. Busca el 'Silent Burnout'—estudiantes con notas altas pero baja satisfacción.",
+        'student_360': "Student 360 usa Modelado de Comportamiento y grupos de conducta. Busca el 'Silent Burnout'—estudiantes con notas altas pero baja satisfacción.",
         'raw_data': "Data Explorer da acceso a la capa analítica de BigQuery. Esencial para auditar la importancia de las variables o puntuaciones psicométricas.",
         'risk_high': "Riesgo crítico: caída drástica en interacciones en el campus, falta a exámenes y baja flexibilidad reportada.",
         'risk_low': "Probabilidad de persistencia alta. Estos estudiantes son del arquetipo 'Resilient'—estables bajo presión académica.",
-        'cluster_info': "K-Means identificó 4 arquetipos: desde 'Estudiantes Trabajadores' hasta 'Social Learners' impulsados por el compromiso.",
+        'cluster_info': "K-Means identificó 4 arquetipos o grupos: desde 'Estudiantes Trabajadores' hasta 'Social Learners' impulsados por el compromiso.",
         'satisfaction': "Satisfaction Predictor estima el bienestar. Una brecha negativa entre satisfacción real y predicha suele preceder al abandono.",
         'fallback': "Puedo darte insights sobre: Segmentación de Riesgo, Arquetipos, Análisis de Satisfacción y Prioridad de Intervención."
     },
@@ -55,11 +55,11 @@ _ALEX_RESPONSES = {
         'greeting': "Salutations. Je suis Alex. J'analyse les schémas de données complexes pour identifier les signes précoces de décrochage (churn).",
         'dashboard': "Le Tableau de Bord affiche les résultats du processus KDD. Surveillez le 'Dropout Forecast'—il utilise Random Forest pour prédire la persévérance.",
         'intervention_console': "Cette console segmente les étudiants par score multifactoriel. Ciblez les cas 'Critiques' (>75% de risque) avec une baisse de fréquence d'examens.",
-        'student_360': "Student 360 utilise le Clustering Comportamentale. Cherchez le 'Silent Burnout'—étudiants avec de bonnes notes mais une faible satisfaction.",
+        'student_360': "Student 360 utilise le Clustering Comportemental. Cherchez le 'Silent Burnout'—étudiants avec de bonnes notes mais une faible satisfaction.",
         'raw_data': "Data Explorer donne accès à la couche analytique BigQuery. Essentiel pour auditer l'importance des variables ou les scores psychométriques.",
         'risk_high': "Risque critique : chute des interactions sur le campus, examens manqués et faibles scores de flexibilité.",
         'risk_low': "Probabilité de persévérance élevée. Étudiants de type 'Résilient'—stables même sous pression académique.",
-        'cluster_info': "K-Means a identifié 4 archétypes : des 'Étudiants Salariés' aux 'Apprenants Sociaux' motivés par l'engagement.",
+        'cluster_info': "K-Means a identifié 4 archétypes ou groupes : des 'Étudiants Salariés' aux 'Apprenants Sociaux' motivés par l'engagement.",
         'satisfaction': "Satisfaction Predictor estime le bien-être. Un écart négatif entre satisfaction réelle et prédite précède souvent le décrochage.",
         'fallback': "Je peux vous éclairer sur : la Segmentation des Risques, les Archétypes, l'Analyse de Satisfaction et les Priorités d'Intervention."
     }
@@ -69,7 +69,7 @@ def _detect_chat_language(text: str) -> str:
     """Detects if the input is likely Italian, Spanish, French or English."""
     langs = {
         'it': ["ciao", "come", "perché", "quali", "rischio", "abbandono", "studente", "università", "esame", "voto"],
-        'es': ["hola", "como", "porque", "riesgo", "abandono", "estudiante", "universidad", "examen", "nota"],
+        'es': ["hola", "como", "porque", "riesgo", "abandono", "estudiante", "universidad", "examen", "nota", "grupos"],
         'fr': ["salut", "comment", "pourquoi", "risque", "abandon", "étudiant", "université", "examen", "note"]
     }
     text_lower = text.lower()
@@ -97,7 +97,7 @@ def get_alex_response(message: str, current_page: str = "Dashboard", lang: str =
     msg_lower = message.lower()
     
     # 1. Risk & Churn (Priority)
-    if any(kw in msg_lower for kw in ["risk", "dropout", "churn", "critical", "intervention", "pericolo", "rischio", "abbandono", "riesgo", "abandon", "risque"]):
+    if any(kw in msg_lower for kw in ["risk", "dropout", "churn", "critical", "intervention", "pericolo", "rischio", "abbandono", "riesgo", "abandon", "risque", "riesgos"]):
         if any(kw in msg_lower for kw in ["high", "critical", "danger", "critico", "pericoloso", "peligro", "dangereux"]):
             return responses['risk_high']
         elif any(kw in msg_lower for kw in ["low", "safe", "stable", "sicuro", "tranquillo", "seguro", "estable", "stable"]):
@@ -105,7 +105,7 @@ def get_alex_response(message: str, current_page: str = "Dashboard", lang: str =
         return responses['intervention_console']
     
     # 2. Clustering
-    if any(kw in msg_lower for kw in ["cluster", "segment", "group", "archetype", "behavior", "comportamento", "gruppo", "archetipo", "comportamiento", "groupe", "archétype"]):
+    if any(kw in msg_lower for kw in ["cluster", "segment", "group", "archetype", "behavior", "comportamento", "gruppo", "archetipo", "comportamiento", "groupe", "archétype", "grupos"]):
         return responses['cluster_info']
     
     # 3. Satisfaction & Burnout
@@ -123,8 +123,6 @@ def get_alex_response(message: str, current_page: str = "Dashboard", lang: str =
         return responses['greeting']
     
     # 6. Page-specific fallbacks
-
-    # Page-specific fallbacks
     if any(kw in msg_lower for kw in ["dashboard", "control", "tower", "kpi"]): return responses['dashboard']
     if any(kw in msg_lower for kw in ["console", "action", "intervento", "intervención", "intervention"]): return responses['intervention_console']
     if any(kw in msg_lower for kw in ["360", "profile", "profilo", "perfil", "profil"]): return responses['student_360']
