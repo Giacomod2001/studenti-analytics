@@ -559,11 +559,13 @@ def main():
             def process_alex_chat():
                 msg = st.session_state.get("alex_input_widget", "")
                 if msg:
+                    # Detect Language
+                    detected_lang = ml_utils._detect_chat_language(msg)
                     st.session_state["chat_history"].append({"role": "user", "content": msg})
-                    resp = ml_utils.get_alex_response(msg, current_view)
+                    resp = ml_utils.get_alex_response(msg, current_view, lang=detected_lang)
                     st.session_state["chat_history"].append({"role": "assistant", "content": resp})
                     st.session_state["alex_input_widget"] = ""
-                    st.rerun()
+                    # st.rerun() is now handled automatically by Streamlit after callback
 
             # Display last message or welcome
             assistant_msgs = [m for m in st.session_state["chat_history"] if m["role"] == "assistant"]
